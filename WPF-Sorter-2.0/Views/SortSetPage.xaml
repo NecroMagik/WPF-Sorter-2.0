@@ -1,0 +1,282 @@
+﻿<Page
+    x:Class="WPF_Sorter_2._0.Views.SortSetPage"
+    Style="{DynamicResource MahApps.Styles.Page}"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:converters="clr-namespace:WPF_Sorter_2._0.Converters"
+    xmlns:viewModels="clr-namespace:WPF_Sorter_2._0.ViewModels"
+    mc:Ignorable="d"
+    d:DesignHeight="600" 
+    d:DesignWidth="900"
+    d:DataContext="{d:DesignInstance viewModels:SortSetViewModel}">
+
+    <Page.Resources>
+        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <converters:ExtensionsDisplayConverter x:Key="ExtensionsDisplayConverter" />
+
+        <!-- Стиль карточки категории -->
+        <Style x:Key="CategoryCardStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource MahApps.Brushes.Gray10}" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="Width" Value="280" />
+            <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.Gray7}" />
+            <Style.Triggers>
+                <!-- Акцентная обводка для включённой категории -->
+                <DataTrigger Binding="{Binding IsEnabled}" Value="True">
+                    <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentBrush}" />
+                </DataTrigger>
+                <!-- Серая обводка для выключенной категории -->
+                <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                    <Setter Property="BorderBrush" Value="{DynamicResource MahApps.Brushes.Gray7}" />
+                    <Setter Property="Opacity" Value="0.6" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CategoryToggleButton" TargetType="ToggleButton">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.Text}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <StackPanel Orientation="Horizontal">
+                            <ContentPresenter />
+                            <TextBlock 
+                                Text="&#xE930;" 
+                                FontFamily="Segoe MDL2 Assets" 
+                                FontSize="16"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Opacity" Value="0.3" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource TemplatedParent}}" Value="True">
+                                                <Setter Property="Opacity" Value="1" />
+                                                <Setter Property="Foreground" Value="{DynamicResource SystemAccentBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Заголовок -->
+            <TextBlock
+                Style="{StaticResource PageTitleStyle}"
+                Text="Настройка категорий сортировки"
+                Margin="0,0,0,16" />
+
+            <!-- Блок автоопределения библиотек (переработан) -->
+            <Border 
+                Grid.Row="1"
+                Background="{DynamicResource MahApps.Brushes.Gray10}" 
+                BorderBrush="{DynamicResource SystemAccentBrush}"
+                BorderThickness="2"
+                CornerRadius="8" 
+                Padding="16"
+                Margin="0,0,0,16">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel>
+                        <TextBlock 
+                            Text="📂 Автоопределение библиотек Windows" 
+                            Foreground="{DynamicResource MahApps.Brushes.Text}" 
+                            FontSize="16" 
+                            FontWeight="Bold" />
+                        <TextBlock 
+                            Text="Нажмите кнопку, чтобы автоматически найти стандартные папки (Документы, Музыка, Видео, Изображения)"
+                            Foreground="{DynamicResource MahApps.Brushes.Gray6}"
+                            TextWrapping="Wrap"
+                            Margin="0,4,0,0" />
+                    </StackPanel>
+
+                    <Button 
+                        Grid.Column="1"
+                        Content="🔍 Найти библиотеки" 
+                        Command="{Binding AutoDetectLibrariesCommand}"
+                        Background="{DynamicResource SystemAccentBrush}"
+                        Foreground="White"
+                        FontWeight="SemiBold"
+                        FontSize="14"
+                        Padding="20,12"
+                        Margin="16,0,0,0"
+                        VerticalAlignment="Center"
+                        BorderThickness="0"
+                        Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border 
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="6"
+                                    Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter 
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Opacity" Value="0.9" />
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter Property="Opacity" Value="0.8" />
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Opacity" Value="0.5" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Статус определения библиотек -->
+            <TextBlock 
+                Grid.Row="2"
+                Text="{Binding LibraryDetectionStatus}"
+                Margin="0,0,0,12"
+                FontSize="14"
+                FontWeight="SemiBold"
+                Foreground="{DynamicResource SystemAccentBrush}"
+                Visibility="{Binding IsLibraryStatusVisible, Converter={StaticResource BooleanToVisibilityConverter}, FallbackValue=Collapsed}" />
+
+            <!-- Список категорий -->
+            <WrapPanel 
+                Grid.Row="3"
+                Orientation="Horizontal"
+                Margin="0,4,0,0">
+
+                <ItemsControl ItemsSource="{Binding Categories}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource CategoryCardStyle}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Заголовок категории с Toggle -->
+                                    <ToggleButton 
+                                        Grid.Row="0"
+                                        Style="{StaticResource CategoryToggleButton}"
+                                        IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                        Margin="0,0,0,8">
+                                        <StackPanel Orientation="Vertical">
+                                            <TextBlock 
+                                                Text="{Binding IconGlyph}" 
+                                                FontFamily="Segoe MDL2 Assets" 
+                                                FontSize="24"
+                                                Margin="0,0,8,0" />
+                                            <TextBlock 
+                                                Text="{Binding Name}" 
+                                                FontSize="18" 
+                                                FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </ToggleButton>
+
+                                    <!-- Расширения -->
+                                    <TextBlock 
+                                        Grid.Row="1"
+                                        Text="{Binding Converter={StaticResource ExtensionsDisplayConverter}}"
+                                        FontSize="12"
+                                        Opacity="0.6"
+                                        Margin="0,0,0,8"
+                                        TextTrimming="CharacterEllipsis" />
+
+                                    <!-- Путь назначения -->
+                                    <Grid Grid.Row="2" Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBox 
+                                            Grid.Column="0"
+                                            Text="{Binding CustomPath, UpdateSourceTrigger=PropertyChanged}"
+                                            Style="{DynamicResource MahApps.Styles.TextBox}"
+                                            FontSize="12"
+                                            VerticalContentAlignment="Center"
+                                            Height="28"
+                                            TextWrapping="NoWrap" />
+
+                                        <Button 
+                                            Grid.Column="1"
+                                            Content="…" 
+                                            Command="{Binding RelativeSource={RelativeSource AncestorType=Page}, Path=DataContext.BrowsePathCommand}"
+                                            CommandParameter="{Binding}"
+                                            Width="30"
+                                            Height="28"
+                                            Margin="4,0,0,0"
+                                            Padding="0" />
+                                    </Grid>
+
+                                    <!-- Кнопка сброса -->
+                                    <Button 
+                                        Grid.Row="3"
+                                        Content="Сбросить на стандартный"
+                                        Command="{Binding RelativeSource={RelativeSource AncestorType=Page}, Path=DataContext.ResetToDefaultCommand}"
+                                        FontSize="12"
+                                        HorizontalAlignment="Left"
+                                        Padding="0"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Cursor="Hand">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Foreground" Value="{DynamicResource MahApps.Brushes.Gray6}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDefaultPath}" Value="False">
+                                                        <Setter Property="Foreground" Value="{DynamicResource SystemAccentBrush}" />
+                                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </WrapPanel>
+        </Grid>
+    </ScrollViewer>
+</Page>

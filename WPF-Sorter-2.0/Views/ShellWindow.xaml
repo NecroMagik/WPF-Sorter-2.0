@@ -1,0 +1,198 @@
+﻿<controls:MetroWindow
+    x:Class="WPF_Sorter_2._0.Views.ShellWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="http://metro.mahapps.com/winfx/xaml/controls"
+    xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+    xmlns:properties="clr-namespace:WPF_Sorter_2._0.Properties"
+    xmlns:templateSelectors="clr-namespace:WPF_Sorter_2._0.TemplateSelectors"
+    xmlns:converters="clr-namespace:WPF_Sorter_2._0.Converters"
+    Style="{StaticResource CustomMetroWindow}"
+    mc:Ignorable="d"
+    MinWidth="500"
+    MinHeight="350"
+    Title="{x:Static properties:Resources.AppDisplayName}">
+
+    <controls:MetroWindow.Resources>
+        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <converters:BooleanInverterConverter x:Key="BooleanInverterConverter" />
+
+        <templateSelectors:MenuItemTemplateSelector
+            x:Key="MenuItemTemplateSelector">
+            <templateSelectors:MenuItemTemplateSelector.GlyphDataTemplate>
+                <DataTemplate DataType="{x:Type controls:HamburgerMenuGlyphItem}">
+                    <Grid Height="48">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="48" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            Grid.Column="0"
+                            FontSize="16"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe MDL2 Assets"
+                            Text="{Binding Glyph}"
+                            ToolTip="{Binding Label}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            FontSize="16"
+                            Text="{Binding Label}" />
+                    </Grid>
+                </DataTemplate>
+            </templateSelectors:MenuItemTemplateSelector.GlyphDataTemplate>
+            <templateSelectors:MenuItemTemplateSelector.ImageDataTemplate>
+                <DataTemplate DataType="{x:Type controls:HamburgerMenuImageItem}">
+                    <Grid Height="48">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="48" />
+                            <ColumnDefinition />
+                        </Grid.ColumnDefinitions>
+                        <Ellipse
+                            Grid.Column="0"
+                            Width="24"
+                            Height="24"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            ToolTip="{Binding Label}">
+                            <Ellipse.Fill>
+                                <ImageBrush ImageSource="{Binding Thumbnail}" />
+                            </Ellipse.Fill>
+                        </Ellipse>
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            FontSize="16"
+                            Text="{Binding Label}" />
+                    </Grid>
+                </DataTemplate>
+            </templateSelectors:MenuItemTemplateSelector.ImageDataTemplate>
+        </templateSelectors:MenuItemTemplateSelector>
+    </controls:MetroWindow.Resources>
+
+    <controls:MetroWindow.LeftWindowCommands>
+        <controls:WindowCommands>
+            <Button
+                Width="{Binding ElementName=hamburgerMenu, Path=CompactPaneLength}"
+                AutomationProperties.Name="{x:Static properties:Resources.ShellGoBackButton}"
+                ToolTip="{x:Static properties:Resources.ShellGoBackButton}"
+                Command="{Binding GoBackCommand}">
+                <TextBlock
+                    Text="&#xE72B;"
+                    FontSize="14"
+                    FontFamily="Segoe MDL2 Assets"
+                    AutomationProperties.Name="{x:Static properties:Resources.ShellGoBackButton}" />
+            </Button>
+        </controls:WindowCommands>
+    </controls:MetroWindow.LeftWindowCommands>
+
+    <i:Interaction.Triggers>
+        <i:EventTrigger EventName="Loaded">
+            <i:InvokeCommandAction Command="{Binding LoadedCommand}" />
+        </i:EventTrigger>
+        <i:EventTrigger EventName="Unloaded">
+            <i:InvokeCommandAction Command="{Binding UnloadedCommand}" />
+        </i:EventTrigger>
+    </i:Interaction.Triggers>
+
+    <!-- Основной контент -->
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- HamburgerMenu -->
+        <controls:HamburgerMenu
+            Grid.Row="0"
+            x:Name="hamburgerMenu"
+            HamburgerButtonName="{x:Static properties:Resources.ShellHamburgerButtonName}"
+            IsPaneOpen="False"
+            DisplayMode="CompactInline"
+            ItemsSource="{Binding MenuItems}"
+            SelectedItem="{Binding SelectedMenuItem}"
+            ItemCommand="{Binding MenuItemInvokedCommand}"
+            OptionsItemsSource="{Binding OptionMenuItems}"
+            SelectedOptionsItem="{Binding SelectedOptionsMenuItem}"
+            OptionsItemCommand="{Binding OptionsMenuItemInvokedCommand}"
+            OptionsItemTemplateSelector="{StaticResource MenuItemTemplateSelector}"
+            ItemTemplateSelector="{StaticResource MenuItemTemplateSelector}">
+            <controls:HamburgerMenu.Content>
+                <Frame
+                    x:Name="shellFrame"
+                    Grid.Row="1"
+                    NavigationUIVisibility="Hidden"
+                    Focusable="False" />
+            </controls:HamburgerMenu.Content>
+        </controls:HamburgerMenu>
+
+        <!-- Статус-бар -->
+        <Border 
+            Grid.Row="1"
+            Background="{DynamicResource MahApps.Brushes.Gray10}"
+            BorderBrush="{DynamicResource MahApps.Brushes.Gray8}"
+            BorderThickness="0,1,0,0"
+            Padding="16,8"
+            Visibility="{Binding IsSorting, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock 
+                    Grid.Column="0"
+                    Text="{Binding SortStatus}"
+                    FontSize="13"
+                    Foreground="{DynamicResource MahApps.Brushes.Text}"
+                    VerticalAlignment="Center" />
+
+                <ProgressBar 
+                    Grid.Column="1"
+                    Value="{Binding SortProgress}"
+                    Minimum="0"
+                    Maximum="100"
+                    Height="16"
+                    Margin="16,0"
+                    Foreground="{DynamicResource SystemAccentBrush}"
+                    Background="{DynamicResource MahApps.Brushes.Gray8}" />
+
+                <Button 
+                    Grid.Column="2"
+                    Content="⏹ Отмена"
+                    Command="{Binding CancelSortingCommand}"
+                    FontSize="12"
+                    Padding="12,4"
+                    Background="{DynamicResource SystemAccentBrush}"
+                    Foreground="White"
+                    BorderThickness="0"
+                    Cursor="Hand">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border 
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                                <ContentPresenter 
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Opacity" Value="0.9" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Opacity" Value="0.8" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</controls:MetroWindow>
