@@ -1,7 +1,5 @@
-﻿using System.Windows;
-
-using Microsoft.Extensions.Configuration;
-
+﻿using Microsoft.Extensions.Configuration;
+using System.Windows;
 using WPF_Sorter_2._0.Contracts.Activation;
 using WPF_Sorter_2._0.Contracts.Services;
 using WPF_Sorter_2._0.Contracts.Views;

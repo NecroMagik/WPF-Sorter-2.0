@@ -1,5 +1,5 @@
-﻿using System.Windows.Media;
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
+using System.Windows.Media;
 
 namespace WPF_Sorter_2._0.Services;
 

@@ -1,7 +1,7 @@
-﻿using System.Windows;
-using System.Windows.Media;
-using ControlzEx.Theming;
+﻿using ControlzEx.Theming;
 using MahApps.Metro.Theming;
+using System.Windows;
+using System.Windows.Media;
 using WPF_Sorter_2._0.Contracts.Services;
 using WPF_Sorter_2._0.Models;
 

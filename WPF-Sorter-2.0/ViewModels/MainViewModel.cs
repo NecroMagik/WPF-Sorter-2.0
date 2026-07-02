@@ -1,12 +1,10 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Ookii.Dialogs.Wpf;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using WPF_Sorter_2._0.Contracts.ViewModels;
 using WPF_Sorter_2._0.Core.Models;
-using WPF_Sorter_2._0.Core.Services;
 using WPF_Sorter_2._0.Services;
 
 namespace WPF_Sorter_2._0.ViewModels;

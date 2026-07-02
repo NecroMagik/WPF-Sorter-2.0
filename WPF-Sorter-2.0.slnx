@@ -1,8 +1,4 @@
 <Solution>
-  <Folder Name="/.github/" />
-  <Folder Name="/.github/workflows/">
-    <File Path="release.yml" />
-  </Folder>
   <Project Path="WPF-Sorter-2.0.Core/WPF-Sorter-2.0.Core.csproj" />
   <Project Path="WPF-Sorter-2.0/WPF-Sorter-2.0.csproj" />
 </Solution>

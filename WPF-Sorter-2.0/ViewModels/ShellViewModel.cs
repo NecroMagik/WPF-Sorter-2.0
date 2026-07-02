@@ -1,14 +1,10 @@
-﻿using System.Collections.ObjectModel;
-using System.Windows.Input;
-
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-
 using MahApps.Metro.Controls;
-
+using System.Collections.ObjectModel;
+using System.Windows.Input;
 using WPF_Sorter_2._0.Contracts.Services;
 using WPF_Sorter_2._0.Core.Models;
-using WPF_Sorter_2._0.Properties;
 using WPF_Sorter_2._0.Services;
 
 namespace WPF_Sorter_2._0.ViewModels;

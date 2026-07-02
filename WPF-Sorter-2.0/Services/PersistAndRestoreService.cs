@@ -1,8 +1,6 @@
-﻿using System.Collections;
+﻿using Microsoft.Extensions.Options;
+using System.Collections;
 using System.IO;
-
-using Microsoft.Extensions.Options;
-
 using WPF_Sorter_2._0.Contracts.Services;
 using WPF_Sorter_2._0.Core.Contracts.Services;
 using WPF_Sorter_2._0.Models;

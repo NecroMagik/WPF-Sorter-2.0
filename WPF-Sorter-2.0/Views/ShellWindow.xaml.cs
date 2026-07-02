@@ -1,12 +1,10 @@
 ﻿using MahApps.Metro.Controls;
 using Microsoft.Win32;
-using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using WPF_Sorter_2._0.Contracts.Services;
 using WPF_Sorter_2._0.Contracts.Views;
-using WPF_Sorter_2._0.Services;
 using WPF_Sorter_2._0.ViewModels;
 
 namespace WPF_Sorter_2._0.Views;

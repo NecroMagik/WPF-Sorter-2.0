@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.IO;
 using WPF_Sorter_2._0.Core.Models;
 
 namespace WPF_Sorter_2._0.Services

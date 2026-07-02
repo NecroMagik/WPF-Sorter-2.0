@@ -12,10 +12,10 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ImplicitUsings>enable</ImplicitUsings>
 	<NoWarn>MVVMTK0034</NoWarn>
-	<AssemblyVersion>2.0.1</AssemblyVersion>
+	<AssemblyVersion>2.0.5</AssemblyVersion>
 	<AssemblyName>WPF-Sorter-2.0</AssemblyName>
 	<AssemblyTitle>WPF-Sorter-2.0</AssemblyTitle>
-	<FileVersion>2.0.1</FileVersion>
+	<FileVersion>2.0.5</FileVersion>
   </PropertyGroup>
   
   <ItemGroup>
