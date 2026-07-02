@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using WPF_Sorter_2._0.Core.Models;
+﻿using WPF_Sorter_2._0.Core.Models;
 using WPF_Sorter_2._0.Core.Services;
 using WPF_Sorter_2._0.ViewModels;
 

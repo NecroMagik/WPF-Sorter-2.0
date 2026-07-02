@@ -1,7 +1,5 @@
-﻿using System.Windows.Controls;
-
-using CommunityToolkit.Mvvm.ComponentModel;
-
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+using System.Windows.Controls;
 using WPF_Sorter_2._0.Contracts.Services;
 using WPF_Sorter_2._0.ViewModels;
 using WPF_Sorter_2._0.Views;

@@ -80,67 +80,69 @@
                 </StackPanel>
 
                 <!-- 👇 Блок 2: Обновления -->
+                <!-- 👇 Блок 2: Обновления -->
                 <TextBlock
-                    Margin="{StaticResource SmallTopMargin}"
-                    Style="{StaticResource SubtitleTextStyle}"
-                    Text="Обновления" />
+    Margin="{StaticResource SmallTopMargin}"
+    Style="{StaticResource SubtitleTextStyle}"
+    Text="Обновления" />
                 <StackPanel Margin="{StaticResource SmallTopBottomMargin}">
                     <TextBlock
-                        Style="{StaticResource BodyTextStyle}"
-                        Text="Выберите ветку обновлений:" />
+        Style="{StaticResource BodyTextStyle}"
+        Text="Ветка обновлений:" />
                     <StackPanel Margin="{StaticResource XSmallTopMargin}">
                         <RadioButton
-                            GroupName="UpdateChannel"
-                            Content="Main (стабильная)"
-                            FontSize="{StaticResource MediumFontSize}"
-                            IsChecked="True" />
-                        <RadioButton
-                            GroupName="UpdateChannel"
-                            Content="Beta (тестовая)"
-                            Margin="{StaticResource XSmallTopMargin}"
-                            FontSize="{StaticResource MediumFontSize}" />
-                        <RadioButton
-                            GroupName="UpdateChannel"
-                            Content="Rebuild (экспериментальная)"
-                            Margin="{StaticResource XSmallTopMargin}"
-                            FontSize="{StaticResource MediumFontSize}" />
+            GroupName="UpdateChannel"
+            Content="Main (стабильная)"
+            FontSize="{StaticResource MediumFontSize}"
+            IsChecked="True"
+            IsEnabled="False" />
                     </StackPanel>
 
-                    <Button
-                        Margin="{StaticResource SmallTopMargin}"
-                        Content="🔍 Проверить обновления"
-                        Background="{DynamicResource SystemAccentBrush}"
-                        Foreground="White"
-                        FontWeight="SemiBold"
-                        FontSize="14"
-                        Padding="20,12"
-                        VerticalAlignment="Center"
-                        BorderThickness="0"
-                        Cursor="Hand">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border 
-                                    Background="{TemplateBinding Background}"
-                                    CornerRadius="6"
-                                    Padding="{TemplateBinding Padding}">
-                                    <ContentPresenter 
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center" />
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Opacity" Value="0.9" />
-                                    </Trigger>
-                                    <Trigger Property="IsPressed" Value="True">
-                                        <Setter Property="Opacity" Value="0.8" />
-                                    </Trigger>
-                                    <Trigger Property="IsEnabled" Value="False">
-                                        <Setter Property="Opacity" Value="0.5" />
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
+                    <StackPanel Margin="{StaticResource SmallTopMargin}">
+                        <Button
+            Content="🔍 Проверить обновления"
+            Command="{Binding CheckForUpdatesCommand}"
+            Background="{DynamicResource SystemAccentBrush}"
+            Foreground="White"
+            FontWeight="SemiBold"
+            FontSize="14"
+            Padding="20,12"
+            VerticalAlignment="Center"
+            BorderThickness="0"
+            Cursor="Hand"
+            HorizontalAlignment="Left">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border 
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="6"
+                        Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter 
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Opacity" Value="0.9" />
+                                        </Trigger>
+                                        <Trigger Property="IsPressed" Value="True">
+                                            <Setter Property="Opacity" Value="0.8" />
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.5" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <TextBlock
+            Text="{Binding UpdateStatus}"
+            Margin="{StaticResource XSmallTopMargin}"
+            Style="{StaticResource BodyTextStyle}"
+            Foreground="{DynamicResource MahApps.Brushes.Text}"
+            TextWrapping="Wrap" />
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- 👇 Блок 3: О приложении -->

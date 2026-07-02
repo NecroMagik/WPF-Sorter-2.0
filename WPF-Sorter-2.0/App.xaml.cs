@@ -1,15 +1,12 @@
-﻿using System.IO;
+﻿using CommunityToolkit.WinUI.Notifications;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
-
-using CommunityToolkit.WinUI.Notifications;
-
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-
 using WPF_Sorter_2._0.Activation;
 using WPF_Sorter_2._0.Contracts.Activation;
 using WPF_Sorter_2._0.Contracts.Services;
@@ -31,8 +28,8 @@ public partial class App : Application
         where T : class
         => _host.Services.GetService(typeof(T)) as T;
 
-    
-    
+
+
     public App()
     {
     }
@@ -99,6 +96,7 @@ public partial class App : Application
         services.AddSingleton<IPageService, PageService>();
         services.AddSingleton<INavigationService, NavigationService>();
         services.AddSingleton<SettingsService>();
+        services.AddSingleton<UpdateService>();
 
         // Views and ViewModels
         services.AddTransient<IShellWindow, ShellWindow>();
