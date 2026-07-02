@@ -10,5 +10,7 @@ public partial class SettingsPage : Page
     {
         InitializeComponent();
         DataContext = viewModel;
+
+        System.Diagnostics.Debug.WriteLine("=== SettingsPage CONSTRUCTOR CALLED ===");
     }
 }

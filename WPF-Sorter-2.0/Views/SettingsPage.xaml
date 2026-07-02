@@ -10,24 +10,28 @@
     xmlns:properties="clr-namespace:WPF_Sorter_2._0.Properties"
     xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
     mc:Ignorable="d"
-    d:DesignHeight="450" d:DesignWidth="800">
+    d:DesignHeight="600" d:DesignWidth="800">
     <Page.Resources>
         <converters:EnumToBooleanConverter x:Key="EnumToBooleanConverter" EnumType="models:AppTheme" />
+        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     </Page.Resources>
-    <ScrollViewer>
-        <Grid Margin="{StaticResource SmallTopBottomMargin}">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="24">
             <Grid.RowDefinitions>
                 <RowDefinition Height="48" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
+
             <TextBlock
                 Style="{StaticResource PageTitleStyle}"
                 Text="Настройки приложения" />
+
             <StackPanel
                 x:Name="ContentArea"
                 Grid.Row="1"
-                Margin="{StaticResource MediumLeftRightMargin}">
+                Margin="0,0,24,0">
 
+                <!-- 👇 Блок 1: Персонализация (Тема) -->
                 <TextBlock
                     Margin="{StaticResource SmallTopMargin}"
                     Style="{StaticResource SubtitleTextStyle}"
@@ -39,7 +43,7 @@
                     <StackPanel Margin="{StaticResource XSmallTopMargin}">
                         <RadioButton
                             GroupName="AppTheme"
-                            Content="{x:Static properties:Resources.SettingsPageRadioButtonLightTheme}"
+                            Content="Светлая"
                             FontSize="{StaticResource MediumFontSize}"
                             IsChecked="{Binding Theme, Mode=OneWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Light}">
                             <i:Interaction.Triggers>
@@ -50,7 +54,7 @@
                         </RadioButton>
                         <RadioButton
                             GroupName="AppTheme"
-                            Content="{x:Static properties:Resources.SettingsPageRadioButtonDarkTheme}"
+                            Content="Тёмная"
                             Margin="{StaticResource XSmallTopMargin}"
                             FontSize="{StaticResource MediumFontSize}"
                             IsChecked="{Binding Theme, Mode=OneWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Dark}">
@@ -62,9 +66,9 @@
                         </RadioButton>
                         <RadioButton
                             GroupName="AppTheme"
-                            Content="{x:Static properties:Resources.SettingsPageRadioButtonWindowsDefaultTheme}"
-                            FontSize="{StaticResource MediumFontSize}"
+                            Content="Системная"
                             Margin="{StaticResource XSmallTopMargin}"
+                            FontSize="{StaticResource MediumFontSize}"
                             IsChecked="{Binding Theme, Mode=OneWay, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Default}">
                             <i:Interaction.Triggers>
                                 <i:EventTrigger EventName="Checked">
@@ -75,19 +79,91 @@
                     </StackPanel>
                 </StackPanel>
 
+                <!-- 👇 Блок 2: Обновления -->
                 <TextBlock
                     Margin="{StaticResource SmallTopMargin}"
                     Style="{StaticResource SubtitleTextStyle}"
-                    Text="{x:Static properties:Resources.SettingsPageAboutTitle}" />
-                <TextBlock
-                    Text="{Binding VersionDescription, Mode=OneWay}"
-                    Margin="{StaticResource XSmallTopMargin}"
-                    Style="{StaticResource BodyTextStyle}" />
-                <TextBlock
-                    Margin="{StaticResource XSmallTopMargin}"
-                    Style="{StaticResource BodyTextStyle}"
-                    Text="{x:Static properties:Resources.SettingsPageAboutText}" />
+                    Text="Обновления" />
+                <StackPanel Margin="{StaticResource SmallTopBottomMargin}">
+                    <TextBlock
+                        Style="{StaticResource BodyTextStyle}"
+                        Text="Выберите ветку обновлений:" />
+                    <StackPanel Margin="{StaticResource XSmallTopMargin}">
+                        <RadioButton
+                            GroupName="UpdateChannel"
+                            Content="Main (стабильная)"
+                            FontSize="{StaticResource MediumFontSize}"
+                            IsChecked="True" />
+                        <RadioButton
+                            GroupName="UpdateChannel"
+                            Content="Beta (тестовая)"
+                            Margin="{StaticResource XSmallTopMargin}"
+                            FontSize="{StaticResource MediumFontSize}" />
+                        <RadioButton
+                            GroupName="UpdateChannel"
+                            Content="Rebuild (экспериментальная)"
+                            Margin="{StaticResource XSmallTopMargin}"
+                            FontSize="{StaticResource MediumFontSize}" />
+                    </StackPanel>
 
+                    <Button
+                        Margin="{StaticResource SmallTopMargin}"
+                        Content="🔍 Проверить обновления"
+                        Background="{DynamicResource SystemAccentBrush}"
+                        Foreground="White"
+                        FontWeight="SemiBold"
+                        FontSize="14"
+                        Padding="20,12"
+                        VerticalAlignment="Center"
+                        BorderThickness="0"
+                        Cursor="Hand">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border 
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="6"
+                                    Padding="{TemplateBinding Padding}">
+                                    <ContentPresenter 
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Opacity" Value="0.9" />
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter Property="Opacity" Value="0.8" />
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Opacity" Value="0.5" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </StackPanel>
+
+                <!-- 👇 Блок 3: О приложении -->
+                <TextBlock
+                    Margin="{StaticResource SmallTopMargin}"
+                    Style="{StaticResource SubtitleTextStyle}"
+                    Text="О приложении" />
+                <StackPanel Margin="{StaticResource SmallTopBottomMargin}">
+                    <TextBlock
+                        Text="{Binding VersionDescription, Mode=OneWay}"
+                        Margin="{StaticResource XSmallTopMargin}"
+                        Style="{StaticResource BodyTextStyle}"
+                        FontWeight="SemiBold"
+                        Foreground="{DynamicResource MahApps.Brushes.Text}" />
+                    <TextBlock
+                        Margin="{StaticResource XSmallTopMargin}"
+                        Style="{StaticResource BodyTextStyle}"
+                        Text="{Binding ApplicationInfo, Mode=OneWay}"
+                        TextWrapping="Wrap"
+                        Foreground="{DynamicResource MahApps.Brushes.Text}" />
+                </StackPanel>
+
+                <!-- 👇 Блок 4: Политика конфиденциальности -->
                 <TextBlock
                     Margin="{StaticResource SmallTopMargin}"
                     AutomationProperties.Name="{Binding Text, ElementName=settingsPrivacyStatement}">

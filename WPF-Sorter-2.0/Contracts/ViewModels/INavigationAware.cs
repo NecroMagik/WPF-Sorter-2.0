@@ -1,7 +1,8 @@
-﻿namespace WPF_Sorter_2._0.Contracts.ViewModels;
-
-public interface INavigationAware
+﻿namespace WPF_Sorter_2._0.Contracts.ViewModels
 {
-    void OnNavigatedTo(object parameter);
-    void OnNavigatedFrom();
+    internal interface INavigationAware
+    {
+        void OnNavigatedTo(object parameter);
+        void OnNavigatedFrom();
+    }
 }

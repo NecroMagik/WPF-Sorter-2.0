@@ -2,5 +2,7 @@
 
 public interface IApplicationInfoService
 {
-    Version GetVersion();
+    string GetVersion();
+    string GetProductName();
+    string GetAssemblyName();
 }

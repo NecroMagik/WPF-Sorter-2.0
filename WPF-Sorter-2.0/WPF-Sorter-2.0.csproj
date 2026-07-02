@@ -1,5 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   
+  <PropertyGroup Label="Globals">
+    <WebView2DispatchAdapterNamespace>WPF_Sorter_2._0</WebView2DispatchAdapterNamespace>
+  </PropertyGroup>
+  
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
@@ -9,6 +13,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
 	<NoWarn>MVVMTK0034</NoWarn>
 	<AssemblyVersion>2.0.1</AssemblyVersion>
+	<AssemblyName>WPF-Sorter-2.0</AssemblyName>
+	<AssemblyTitle>WPF-Sorter-2.0</AssemblyTitle>
+	<FileVersion>2.0.1</FileVersion>
   </PropertyGroup>
   
   <ItemGroup>

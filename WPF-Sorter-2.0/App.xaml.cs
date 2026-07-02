@@ -32,6 +32,7 @@ public partial class App : Application
         => _host.Services.GetService(typeof(T)) as T;
 
     
+    
     public App()
     {
     }
