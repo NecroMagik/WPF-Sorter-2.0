@@ -5,7 +5,7 @@ on:
     tags:
       - 'v*'  # Запуск при создании тега v1.0.0, v1.1.0 и т.д.
   workflow_dispatch:  # Возможность запустить вручную из интерфейса GitHub
-premissions:
+permissions:
   contents: write
   
 jobs:
