@@ -16,7 +16,7 @@
 	<AssemblyName>WPF-Sorter-2.0</AssemblyName>
 	<AssemblyTitle>WPF-Sorter-2.0</AssemblyTitle>
 	<FileVersion>2.0.6</FileVersion>
-	  <EnableMsixTooling>true</EnableMsixTooling>
+	<EnableMsixTooling>true</EnableMsixTooling>
   </PropertyGroup>
   
   <ItemGroup>
