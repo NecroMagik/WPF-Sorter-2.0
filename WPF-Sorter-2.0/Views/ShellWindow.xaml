@@ -9,11 +9,15 @@
     xmlns:properties="clr-namespace:WPF_Sorter_2._0.Properties"
     xmlns:templateSelectors="clr-namespace:WPF_Sorter_2._0.TemplateSelectors"
     xmlns:converters="clr-namespace:WPF_Sorter_2._0.Converters"
-    Style="{StaticResource CustomMetroWindow}"
     mc:Ignorable="d"
     MinWidth="500"
     MinHeight="350"
-    Title="{x:Static properties:Resources.AppDisplayName}">
+    Title="{x:Static properties:Resources.AppDisplayName}"
+    WindowStyle="SingleBorderWindow"
+    AllowsTransparency="False"
+    ResizeMode="CanResizeWithGrip"
+    ShowTitleBar="True"
+    UseNoneWindowStyle="False">
 
     <controls:MetroWindow.Resources>
         <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
@@ -73,6 +77,7 @@
         </templateSelectors:MenuItemTemplateSelector>
     </controls:MetroWindow.Resources>
 
+    <!-- 👇 УБИРАЕМ LeftWindowCommands — они не нужны -->
     <controls:MetroWindow.LeftWindowCommands>
         <controls:WindowCommands>
             <Button
@@ -105,7 +110,6 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- HamburgerMenu -->
         <controls:HamburgerMenu
             Grid.Row="0"
             x:Name="hamburgerMenu"

@@ -96,7 +96,13 @@ public partial class App : Application
         services.AddSingleton<IPageService, PageService>();
         services.AddSingleton<INavigationService, NavigationService>();
         services.AddSingleton<SettingsService>();
-        services.AddSingleton<UpdateService>();
+
+        services.AddSingleton<UpdateService>(sp =>
+            new UpdateService(
+                sp.GetRequiredService<IApplicationInfoService>(),
+                sp.GetRequiredService<IToastNotificationsService>()
+            )
+        );
 
         // Views and ViewModels
         services.AddTransient<IShellWindow, ShellWindow>();
@@ -119,86 +125,34 @@ public partial class App : Application
     {
         try
         {
-            var accentColor = SystemAccentService.GetSystemAccentColor();
-            var accentBrush = new SolidColorBrush(accentColor);
-            var accentLightBrush = new SolidColorBrush(Color.FromArgb(0x40, accentColor.R, accentColor.G, accentColor.B));
+            // 👇 Для границ — яркий цвет
+            var borderColor = SystemAccentService.GetSystemAccentColor();
+            var borderBrush = new SolidColorBrush(borderColor);
 
-            System.Diagnostics.Debug.WriteLine($"🎨 Loading system accent: R={accentColor.R}, G={accentColor.G}, B={accentColor.B}");
+            // 👇 Для интерфейса — с учётом ColorPrevalence
+            var interfaceColor = SystemAccentService.GetInterfaceAccentColor();
+            var interfaceBrush = new SolidColorBrush(interfaceColor);
+            var interfaceLightBrush = new SolidColorBrush(Color.FromArgb(0x40, interfaceColor.R, interfaceColor.G, interfaceColor.B));
 
-            // 👇 Обновляем SystemAccentBrush
-            if (Application.Current.Resources.Contains("SystemAccentBrush"))
-            {
-                Application.Current.Resources["SystemAccentBrush"] = accentBrush;
-            }
-            else
-            {
-                Application.Current.Resources.Add("SystemAccentBrush", accentBrush);
-            }
+            System.Diagnostics.Debug.WriteLine($"🎨 Border accent: R={borderColor.R}, G={borderColor.G}, B={borderColor.B}");
+            System.Diagnostics.Debug.WriteLine($"🎨 Interface accent: R={interfaceColor.R}, G={interfaceColor.G}, B={interfaceColor.B}");
 
-            if (Application.Current.Resources.Contains("SystemAccentLightBrush"))
-            {
-                Application.Current.Resources["SystemAccentLightBrush"] = accentLightBrush;
-            }
-            else
-            {
-                Application.Current.Resources.Add("SystemAccentLightBrush", accentLightBrush);
-            }
-
-            // 👇 Переопределяем все акценты MahApps
-            var accentKeys = new[]
-            {
-            "MahApps.Brushes.Accent",
-            "MahApps.Brushes.Accent2",
-            "MahApps.Brushes.Accent3",
-            "MahApps.Brushes.Accent4",
-            "MahApps.Brushes.AccentBase",
-            "MahApps.Brushes.AccentColorBrush",
-            "MahApps.Colors.Accent",
-            "MahApps.Colors.AccentBase"
-        };
-
-            foreach (var key in accentKeys)
-            {
-                if (Application.Current.Resources.Contains(key))
-                {
-                    Application.Current.Resources[key] = accentBrush;
-                }
-                else
-                {
-                    Application.Current.Resources.Add(key, accentBrush);
-                }
-            }
-
-            // 👇 Обновляем все словари
-            foreach (var dict in Application.Current.Resources.MergedDictionaries)
-            {
-                foreach (var key in accentKeys)
-                {
-                    if (dict.Contains(key))
-                    {
-                        dict[key] = accentBrush;
-                    }
-                }
-            }
+            // Ресурсы
+            Application.Current.Resources["SystemAccentBrush"] = interfaceBrush;
+            Application.Current.Resources["SystemAccentLightBrush"] = interfaceLightBrush;
+            Application.Current.Resources["Theme.PrimaryAccentColor"] = interfaceColor;
+            Application.Current.Resources["MahApps.Brushes.Accent"] = interfaceBrush;
+            Application.Current.Resources["MahApps.Brushes.Accent2"] = interfaceBrush;
+            Application.Current.Resources["MahApps.Brushes.Accent3"] = interfaceBrush;
+            Application.Current.Resources["MahApps.Brushes.Accent4"] = interfaceBrush;
+            Application.Current.Resources["MahApps.Brushes.AccentBase"] = interfaceBrush;
+            Application.Current.Resources["MahApps.Colors.Accent"] = interfaceColor;
+            Application.Current.Resources["MahApps.Colors.AccentBase"] = interfaceColor;
+            Application.Current.Resources["WindowBorderBrush"] = borderBrush;
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"❌ Error loading system accent: {ex.Message}");
-
-            // Fallback на синий
-            var fallbackColor = Color.FromRgb(0x00, 0x78, 0xD7);
-            var fallbackBrush = new SolidColorBrush(fallbackColor);
-
-            if (Application.Current.Resources.Contains("SystemAccentBrush"))
-            {
-                Application.Current.Resources["SystemAccentBrush"] = fallbackBrush;
-            }
-            else
-            {
-                Application.Current.Resources.Add("SystemAccentBrush", fallbackBrush);
-            }
-
-            Application.Current.Resources["MahApps.Brushes.Accent"] = fallbackBrush;
+            System.Diagnostics.Debug.WriteLine($"❌ Error loading accent: {ex.Message}");
         }
     }
 

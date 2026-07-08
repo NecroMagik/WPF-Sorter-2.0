@@ -2,10 +2,14 @@
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Options;
 using System.Data;
+using System.Windows;
 using System.Windows.Input;
 using WPF_Sorter_2._0.Contracts.Services;
 using WPF_Sorter_2._0.Contracts.ViewModels;
+using WPF_Sorter_2._0.Core.Models;
 using WPF_Sorter_2._0.Models;
+using WPF_Sorter_2._0.Services;
+using WPF_Sorter_2._0.Views;
 
 namespace WPF_Sorter_2._0.ViewModels;
 
@@ -15,6 +19,7 @@ public partial class SettingsViewModel : ObservableObject, INavigationAware
     private readonly IThemeSelectorService _themeSelectorService;
     private readonly ISystemService _systemService;
     private readonly IApplicationInfoService _applicationInfoService;
+    private readonly UpdateService _updateService;
     private AppTheme _theme;
     private string _versionDescription;
     private ICommand _setThemeCommand;
@@ -51,12 +56,14 @@ public partial class SettingsViewModel : ObservableObject, INavigationAware
         IOptions<AppConfig> appConfig,
         IThemeSelectorService themeSelectorService,
         ISystemService systemService,
-        IApplicationInfoService applicationInfoService)
+        IApplicationInfoService applicationInfoService,
+        UpdateService updateService)
     {
         _appConfig = appConfig.Value;
         _themeSelectorService = themeSelectorService;
         _systemService = systemService;
         _applicationInfoService = applicationInfoService;
+        _updateService = updateService;
 
         System.Diagnostics.Debug.WriteLine("=== SettingsViewModel CONSTRUCTOR CALLED ===");
     }
@@ -97,21 +104,61 @@ public partial class SettingsViewModel : ObservableObject, INavigationAware
 
         try
         {
-            // Пока заглушка — просто имитация проверки
-            await Task.Delay(2000);
+            var updateInfo = await _updateService.CheckForUpdatesAsync();
 
-            // TODO: Реализовать реальную проверку через GitHub API
-            // var updateInfo = await _updateService.CheckForUpdatesAsync(currentVersion);
+            if (updateInfo == null)
+            {
+                UpdateStatus = "✅ У вас последняя версия!";
+                return;
+            }
 
-            UpdateStatus = "✅ У вас последняя версия!";
+            // 👇 ПОКАЗЫВАЕМ КРАСИВОЕ ОКНО
+            var dialog = new UpdateDialog(updateInfo, _applicationInfoService.GetVersion());
+            dialog.Owner = Application.Current.MainWindow;
+
+            var result = dialog.ShowDialog();
+
+            if (result == true && dialog.IsInstallConfirmed)
+            {
+                await DownloadAndInstallUpdateAsync(updateInfo);
+            }
+            else
+            {
+                UpdateStatus = "⏸️ Обновление отложено";
+            }
         }
         catch (Exception ex)
         {
             UpdateStatus = $"❌ Ошибка: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"❌ Ошибка проверки обновлений: {ex.Message}");
         }
         finally
         {
             IsCheckingForUpdates = false;
+        }
+    }
+
+    private async Task DownloadAndInstallUpdateAsync(UpdateInfo updateInfo)
+    {
+        UpdateStatus = "⬇️ Скачивание обновления...";
+
+        var progress = new Progress<int>(p =>
+        {
+            UpdateStatus = $"⬇️ Скачивание: {p}%";
+        });
+
+        try
+        {
+            var filePath = await _updateService.DownloadUpdateAsync(updateInfo, progress);
+            UpdateStatus = "✅ Загрузка завершена! Установка...";
+
+            // Устанавливаем обновление
+            _updateService.InstallUpdate(filePath);
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus = $"❌ Ошибка скачивания: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"❌ Ошибка скачивания: {ex.Message}");
         }
     }
 

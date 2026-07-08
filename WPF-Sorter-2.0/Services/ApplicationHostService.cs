@@ -1,5 +1,6 @@
-﻿using Microsoft.Extensions.Hosting;
-
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System.Diagnostics;
 using WPF_Sorter_2._0.Contracts.Activation;
 using WPF_Sorter_2._0.Contracts.Services;
 using WPF_Sorter_2._0.Contracts.Views;
@@ -18,7 +19,13 @@ public class ApplicationHostService : IHostedService
     private IShellWindow _shellWindow;
     private bool _isInitialized;
 
-    public ApplicationHostService(IServiceProvider serviceProvider, IEnumerable<IActivationHandler> activationHandlers, INavigationService navigationService, IThemeSelectorService themeSelectorService, IPersistAndRestoreService persistAndRestoreService, IToastNotificationsService toastNotificationsService)
+    public ApplicationHostService(
+        IServiceProvider serviceProvider,
+        IEnumerable<IActivationHandler> activationHandlers,
+        INavigationService navigationService,
+        IThemeSelectorService themeSelectorService,
+        IPersistAndRestoreService persistAndRestoreService,
+        IToastNotificationsService toastNotificationsService)
     {
         _serviceProvider = serviceProvider;
         _activationHandlers = activationHandlers;
@@ -30,13 +37,32 @@ public class ApplicationHostService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        // Initialize services that you need before app activation
         await InitializeAsync();
-
         await HandleActivationAsync();
-
-        // Tasks after activation
         await StartupAsync();
+
+        // 👇 Фоновая проверка обновлений через 5 секунд
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(5000);
+            try
+            {
+                var updateService = _serviceProvider.GetService<UpdateService>();
+                if (updateService != null)
+                {
+                    await updateService.CheckForUpdatesAsync(true);
+                }
+                else
+                {
+                    Debug.WriteLine("⚠️ UpdateService not available for background check");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"❌ Background update check failed: {ex.Message}");
+            }
+        });
+
         _isInitialized = true;
     }
 
@@ -78,7 +104,6 @@ public class ApplicationHostService : IHostedService
 
         if (App.Current.Windows.OfType<IShellWindow>().Count() == 0)
         {
-            // Default activation that navigates to the apps default page
             _shellWindow = _serviceProvider.GetService(typeof(IShellWindow)) as IShellWindow;
             _navigationService.Initialize(_shellWindow.GetNavigationFrame());
             _shellWindow.ShowWindow();

@@ -12,15 +12,10 @@ public class ThemeSelectorService : IThemeSelectorService
     private const string HcDarkTheme = "pack://application:,,,/Styles/Themes/HC.Dark.Blue.xaml";
     private const string HcLightTheme = "pack://application:,,,/Styles/Themes/HC.Light.Blue.xaml";
 
-    public ThemeSelectorService()
-    {
-    }
-
     public void InitializeTheme()
     {
         try
         {
-            // Регистрируем кастомные темы для высокого контраста
             ThemeManager.Current.AddLibraryTheme(new LibraryTheme(new Uri(HcDarkTheme), MahAppsLibraryThemeProvider.DefaultInstance));
             ThemeManager.Current.AddLibraryTheme(new LibraryTheme(new Uri(HcLightTheme), MahAppsLibraryThemeProvider.DefaultInstance));
         }
@@ -46,13 +41,9 @@ public class ThemeSelectorService : IThemeSelectorService
             {
                 ThemeManager.Current.ThemeSyncMode = ThemeSyncMode.SyncWithHighContrast;
                 ThemeManager.Current.SyncTheme();
-
-                // Используем ChangeTheme для смены базовой темы (светлая/тёмная)
-                // Акцент будет переопределён после
                 ThemeManager.Current.ChangeTheme(Application.Current, $"{theme}.Blue", SystemParameters.HighContrast);
             }
 
-            // 👇 ВСЕГДА применяем системный акцент ПОСЛЕ смены темы
             ApplySystemAccent();
 
             if (Application.Current != null)
@@ -76,7 +67,6 @@ public class ThemeSelectorService : IThemeSelectorService
                 return theme;
             }
         }
-
         return AppTheme.Default;
     }
 
@@ -86,71 +76,125 @@ public class ThemeSelectorService : IThemeSelectorService
         {
             if (Application.Current == null) return;
 
-            var accentColor = SystemAccentService.GetSystemAccentColor();
-            var accentBrush = new SolidColorBrush(accentColor);
-            var accentLightBrush = new SolidColorBrush(Color.FromArgb(0x40, accentColor.R, accentColor.G, accentColor.B));
+            // 👇 Цвет для границ окон — всегда яркий (системный)
+            var borderColor = SystemAccentService.GetSystemAccentColor();
+            var borderBrush = new SolidColorBrush(borderColor);
 
-            System.Diagnostics.Debug.WriteLine($"🎨 Applying system accent: R={accentColor.R}, G={accentColor.G}, B={accentColor.B}");
+            // 👇 Цвет для интерфейса — с учётом ColorPrevalence
+            var interfaceColor = SystemAccentService.GetInterfaceAccentColor();
+            var interfaceBrush = new SolidColorBrush(interfaceColor);
+            var interfaceLightBrush = new SolidColorBrush(Color.FromArgb(0x40, interfaceColor.R, interfaceColor.G, interfaceColor.B));
 
-            // 👇 1. Обновляем SystemAccentBrush
-            if (Application.Current.Resources.Contains("SystemAccentBrush"))
-            {
-                Application.Current.Resources["SystemAccentBrush"] = accentBrush;
-            }
-            else
-            {
-                Application.Current.Resources.Add("SystemAccentBrush", accentBrush);
-            }
+            System.Diagnostics.Debug.WriteLine($"🎨 Border accent: R={borderColor.R}, G={borderColor.G}, B={borderColor.B}");
+            System.Diagnostics.Debug.WriteLine($"🎨 Interface accent: R={interfaceColor.R}, G={interfaceColor.G}, B={interfaceColor.B}");
 
-            if (Application.Current.Resources.Contains("SystemAccentLightBrush"))
-            {
-                Application.Current.Resources["SystemAccentLightBrush"] = accentLightBrush;
-            }
-            else
-            {
-                Application.Current.Resources.Add("SystemAccentLightBrush", accentLightBrush);
-            }
+            // 👇 Обновляем ресурсы
+            UpdateResources(borderColor, borderBrush, interfaceColor, interfaceBrush, interfaceLightBrush);
 
-            // 👇 2. Переопределяем все акценты MahApps
-            var accentKeys = new[]
-            {
-                "MahApps.Brushes.Accent",
-                "MahApps.Brushes.Accent2",
-                "MahApps.Brushes.Accent3",
-                "MahApps.Brushes.Accent4",
-                "MahApps.Brushes.AccentBase",
-                "MahApps.Brushes.AccentColorBrush",
-                "MahApps.Colors.Accent",
-                "MahApps.Colors.AccentBase"
-            };
-
-            foreach (var key in accentKeys)
-            {
-                if (Application.Current.Resources.Contains(key))
-                {
-                    Application.Current.Resources[key] = accentBrush;
-                }
-                else
-                {
-                    Application.Current.Resources.Add(key, accentBrush);
-                }
-            }
-
-            // 👇 3. Обновляем все словари
-            foreach (var dict in Application.Current.Resources.MergedDictionaries)
-            {
-                foreach (var key in accentKeys)
-                {
-                    if (dict.Contains(key))
-                    {
-                        dict[key] = accentBrush;
-                    }
-                }
-            }
+            // 👇 Обновляем окна
+            UpdateWindows(borderBrush);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Error applying system accent: {ex.Message}");
         }
+    }
+
+    private void UpdateResources(Color borderColor, SolidColorBrush borderBrush, Color interfaceColor, SolidColorBrush interfaceBrush, SolidColorBrush interfaceLightBrush)
+    {
+        var resources = Application.Current.Resources;
+
+        // Системные ресурсы (интерфейс)
+        SetResource(resources, "SystemAccentBrush", interfaceBrush);
+        SetResource(resources, "SystemAccentLightBrush", interfaceLightBrush);
+
+        // Обязательные для MahApps (интерфейс)
+        SetColorResource(resources, "Theme.PrimaryAccentColor", interfaceColor);
+        SetResource(resources, "Theme.PrimaryAccentColorBrush", interfaceBrush);
+
+        // 👇 MahApps акценты (интерфейс)
+        var accentKeys = new[]
+        {
+            "MahApps.Brushes.Accent",
+            "MahApps.Brushes.Accent2",
+            "MahApps.Brushes.Accent3",
+            "MahApps.Brushes.Accent4",
+            "MahApps.Brushes.AccentBase",
+            "MahApps.Brushes.AccentColorBrush",
+            "MahApps.Colors.Accent",
+            "MahApps.Colors.AccentBase"
+        };
+
+        foreach (var key in accentKeys)
+        {
+            if (key.Contains("Color"))
+            {
+                SetColorResource(resources, key, interfaceColor);
+            }
+            else
+            {
+                SetResource(resources, key, interfaceBrush);
+            }
+        }
+
+        // 👇 Границы окон (всегда яркие)
+        SetResource(resources, "WindowBorderBrush", borderBrush);
+
+        // Обновляем словари
+        foreach (var dict in resources.MergedDictionaries)
+        {
+            if (dict.Contains("Theme.PrimaryAccentColor"))
+            {
+                dict["Theme.PrimaryAccentColor"] = interfaceColor;
+            }
+
+            foreach (var key in accentKeys)
+            {
+                if (dict.Contains(key))
+                {
+                    dict[key] = key.Contains("Color") ? (object)interfaceColor : interfaceBrush;
+                }
+            }
+        }
+    }
+
+    private void UpdateWindows(SolidColorBrush borderBrush)
+    {
+        try
+        {
+            foreach (Window window in Application.Current.Windows)
+            {
+                if (window is MahApps.Metro.Controls.MetroWindow metroWindow)
+                {
+                    // 👇 Границы окон — всегда яркие
+                    metroWindow.BorderBrush = borderBrush;
+                    metroWindow.GlowBrush = borderBrush;
+                    metroWindow.NonActiveBorderBrush = borderBrush;
+                    metroWindow.NonActiveGlowBrush = borderBrush;
+
+                    metroWindow.UpdateLayout();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error updating windows: {ex.Message}");
+        }
+    }
+
+    private void SetResource(ResourceDictionary resources, string key, object value)
+    {
+        if (resources.Contains(key))
+            resources[key] = value;
+        else
+            resources.Add(key, value);
+    }
+
+    private void SetColorResource(ResourceDictionary resources, string key, Color color)
+    {
+        if (resources.Contains(key))
+            resources[key] = color;
+        else
+            resources.Add(key, color);
     }
 }

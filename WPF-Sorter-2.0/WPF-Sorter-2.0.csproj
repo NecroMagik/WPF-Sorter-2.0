@@ -11,11 +11,11 @@
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ImplicitUsings>enable</ImplicitUsings>
-	<NoWarn>MVVMTK0034</NoWarn>
+	  <NoWarn>MVVMTK0034;MVVMTK0045;CS8632</NoWarn>
 	<AssemblyVersion>2.0.5</AssemblyVersion>
 	<AssemblyName>WPF-Sorter-2.0</AssemblyName>
 	<AssemblyTitle>WPF-Sorter-2.0</AssemblyTitle>
-	<FileVersion>2.0.6</FileVersion>
+	<FileVersion>2.0.3</FileVersion>
 	<EnableMsixTooling>true</EnableMsixTooling>
   </PropertyGroup>
   
