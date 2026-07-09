@@ -212,39 +212,24 @@ public class UpdateService
 
         try
         {
-            // 👇 СОЗДАЁМ НОВЫЙ HttpClient С ПОДДЕРЖКОЙ SSL
-            using var handler = new HttpClientHandler();
-            // Разрешаем все сертификаты (решает проблему с SSL)
-            handler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true;
+            // 👇 ИСПОЛЬЗУЕМ WebClient
+            using var client = new System.Net.WebClient();
+            client.Headers.Add("User-Agent", "WPF-Sorter-2.0");
 
-            using var client = new HttpClient(handler);
-            client.DefaultRequestHeaders.UserAgent.TryParseAdd("WPF-Sorter-2.0");
-
-            using var response = await client.GetAsync(updateInfo.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
-            response.EnsureSuccessStatusCode();
-
-            var totalBytes = response.Content.Headers.ContentLength ?? -1;
-            var bytesRead = 0L;
-            var buffer = new byte[8192];
-
-            using var contentStream = await response.Content.ReadAsStreamAsync();
-            using var fileStream = File.Create(filePath);
-
-            while (true)
+            // 👇 ПРОГРЕСС СКАЧИВАНИЯ
+            if (progress != null)
             {
-                var read = await contentStream.ReadAsync(buffer);
-                if (read == 0) break;
-
-                await fileStream.WriteAsync(buffer.AsMemory(0, read));
-                bytesRead += read;
-
-                if (totalBytes > 0 && progress != null)
+                client.DownloadProgressChanged += (s, e) =>
                 {
-                    var percent = (int)((double)bytesRead / totalBytes * 100);
-                    progress.Report(percent);
-                }
+                    progress.Report(e.ProgressPercentage);
+                    Debug.WriteLine($"⬇️ Download progress: {e.ProgressPercentage}%");
+                };
             }
 
+            // 👇 СКАЧИВАЕМ ФАЙЛ
+            await client.DownloadFileTaskAsync(new Uri(updateInfo.DownloadUrl), filePath);
+
+            Debug.WriteLine($"✅ File downloaded: {filePath}");
             return filePath;
         }
         catch (Exception ex)
@@ -253,6 +238,7 @@ public class UpdateService
             throw;
         }
     }
+
 
     /// <summary>
     /// Скачивает и устанавливает обновление
