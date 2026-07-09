@@ -86,7 +86,7 @@ public class ApplicationHostService : IHostedService
     {
         if (!_isInitialized)
         {
-            _toastNotificationsService.ShowToastNotificationSample();
+            
             await Task.CompletedTask;
         }
     }

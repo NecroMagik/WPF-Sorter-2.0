@@ -15,10 +15,18 @@
 	<AssemblyVersion>2.0.5</AssemblyVersion>
 	<AssemblyName>WPF-Sorter-2.0</AssemblyName>
 	<AssemblyTitle>WPF-Sorter-2.0</AssemblyTitle>
-	<FileVersion>2.0.3</FileVersion>
+	<FileVersion>2.0.5</FileVersion>
 	<EnableMsixTooling>true</EnableMsixTooling>
+
+    <ApplicationIcon>Assets\SorterLOGO.ico</ApplicationIcon>
   </PropertyGroup>
-  
+
+	<ItemGroup>
+		<Content Include="Assets\SorterLOGO.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+	
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="CommunityToolkit.WinUI.Notifications" Version="7.1.2" />

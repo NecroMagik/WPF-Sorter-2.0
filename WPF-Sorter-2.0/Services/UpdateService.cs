@@ -116,6 +116,8 @@ public class UpdateService
     {
         try
         {
+            var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "SorterLOGO.ico");
+
             var toastContent = new CommunityToolkit.WinUI.Notifications.ToastContent
             {
                 Visual = new CommunityToolkit.WinUI.Notifications.ToastVisual
