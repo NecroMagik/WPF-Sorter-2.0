@@ -104,6 +104,7 @@ public partial class SettingsViewModel : ObservableObject, INavigationAware
 
         try
         {
+            _updateService.ResetToastFlag();
             var updateInfo = await _updateService.CheckForUpdatesAsync();
 
             if (updateInfo == null)

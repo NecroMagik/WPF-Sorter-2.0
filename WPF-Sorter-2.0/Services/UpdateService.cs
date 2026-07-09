@@ -20,6 +20,9 @@ public class UpdateService
     private readonly string _currentVersion;
     private readonly IToastNotificationsService _toastService;
 
+    private bool _toastShownForCurrentUpdate = false;
+    private UpdateInfo? _lastUpdateInfo;
+
     public event EventHandler<UpdateInfo>? UpdateAvailable;
     public event EventHandler? NoUpdateAvailable;
 
@@ -81,6 +84,8 @@ public class UpdateService
             if (!isNewer)
             {
                 Debug.WriteLine("ℹ️ No updates available");
+                _toastShownForCurrentUpdate = false;
+                _lastUpdateInfo = null;
                 NoUpdateAvailable?.Invoke(this, EventArgs.Empty);
                 return null;
             }
@@ -102,9 +107,15 @@ public class UpdateService
 
             Debug.WriteLine($"✅ Update found: {_currentVersion} -> {latestVersion}");
 
-            if (showToastIfAvailable && _toastService != null)
+            if (showToastIfAvailable && !_toastShownForCurrentUpdate)
             {
                 ShowUpdateToast(updateInfo);
+                _toastShownForCurrentUpdate = true;
+                Debug.WriteLine($"📢 Toast shown (first time for this update)");
+            }
+            else if (showToastIfAvailable && _toastShownForCurrentUpdate)
+            {
+                Debug.WriteLine($"ℹ️ Toast already shown for this update, skipping");
             }
 
             UpdateAvailable?.Invoke(this, updateInfo);
@@ -115,6 +126,15 @@ public class UpdateService
             Debug.WriteLine($"❌ CheckForUpdates error: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// Сбрасывает флаг показа Toast (вызывать при ручной проверке в настройках)
+    /// </summary>
+    public void ResetToastFlag()
+    {
+        _toastShownForCurrentUpdate = false;
+        Debug.WriteLine("🔄 Toast flag reset");
     }
 
     private void ShowUpdateToast(UpdateInfo updateInfo)
@@ -164,7 +184,8 @@ public class UpdateService
             var toast = new Windows.UI.Notifications.ToastNotification(doc)
             {
                 Tag = "UpdateNotification",
-                Group = "Updates"
+                Group = "Updates",
+                ExpirationTime = DateTime.Now.AddSeconds(30)
             };
 
             _toastService.ShowToastNotification(toast);
