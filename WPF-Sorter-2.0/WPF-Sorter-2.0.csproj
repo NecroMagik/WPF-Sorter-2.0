@@ -15,7 +15,7 @@
 	<AssemblyVersion>2.0.5</AssemblyVersion>
 	<AssemblyName>WPF-Sorter-2.0</AssemblyName>
 	<AssemblyTitle>WPF-Sorter-2.0</AssemblyTitle>
-	<FileVersion>2.0.5</FileVersion>
+	<FileVersion>2.0.7</FileVersion>
 	<EnableMsixTooling>true</EnableMsixTooling>
 
     <ApplicationIcon>Assets\SorterLOGO.ico</ApplicationIcon>
