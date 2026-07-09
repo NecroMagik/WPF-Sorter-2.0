@@ -27,6 +27,11 @@ public class UpdateService
     {
         _currentVersion = applicationInfoService.GetVersion();
         _toastService = toastService;
+
+        System.Net.ServicePointManager.SecurityProtocol =
+        System.Net.SecurityProtocolType.Tls12 |
+        System.Net.SecurityProtocolType.Tls13;
+
         _httpClient = new HttpClient();
         _httpClient.DefaultRequestHeaders.UserAgent.TryParseAdd("WPF-Sorter-2.0");
         _httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
@@ -184,32 +189,48 @@ public class UpdateService
 
         var filePath = Path.Combine(tempFolder, updateInfo.AssetName);
 
-        using var response = await _httpClient.GetAsync(updateInfo.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
-        response.EnsureSuccessStatusCode();
-
-        var totalBytes = response.Content.Headers.ContentLength ?? -1;
-        var bytesRead = 0L;
-        var buffer = new byte[8192];
-
-        using var contentStream = await response.Content.ReadAsStreamAsync();
-        using var fileStream = File.Create(filePath);
-
-        while (true)
+        try
         {
-            var read = await contentStream.ReadAsync(buffer);
-            if (read == 0) break;
+            // 👇 СОЗДАЁМ НОВЫЙ HttpClient С ПОДДЕРЖКОЙ SSL
+            using var handler = new HttpClientHandler();
+            // Разрешаем все сертификаты (решает проблему с SSL)
+            handler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true;
 
-            await fileStream.WriteAsync(buffer.AsMemory(0, read));
-            bytesRead += read;
+            using var client = new HttpClient(handler);
+            client.DefaultRequestHeaders.UserAgent.TryParseAdd("WPF-Sorter-2.0");
 
-            if (totalBytes > 0 && progress != null)
+            using var response = await client.GetAsync(updateInfo.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+
+            var totalBytes = response.Content.Headers.ContentLength ?? -1;
+            var bytesRead = 0L;
+            var buffer = new byte[8192];
+
+            using var contentStream = await response.Content.ReadAsStreamAsync();
+            using var fileStream = File.Create(filePath);
+
+            while (true)
             {
-                var percent = (int)((double)bytesRead / totalBytes * 100);
-                progress.Report(percent);
-            }
-        }
+                var read = await contentStream.ReadAsync(buffer);
+                if (read == 0) break;
 
-        return filePath;
+                await fileStream.WriteAsync(buffer.AsMemory(0, read));
+                bytesRead += read;
+
+                if (totalBytes > 0 && progress != null)
+                {
+                    var percent = (int)((double)bytesRead / totalBytes * 100);
+                    progress.Report(percent);
+                }
+            }
+
+            return filePath;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"❌ Download error: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
