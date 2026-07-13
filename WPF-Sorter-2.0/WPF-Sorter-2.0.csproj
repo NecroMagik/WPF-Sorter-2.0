@@ -6,7 +6,7 @@
   
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <RootNamespace>WPF_Sorter_2._0</RootNamespace>
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -15,7 +15,7 @@
 	<AssemblyVersion>2.0.5</AssemblyVersion>
 	<AssemblyName>WPF-Sorter-2.0</AssemblyName>
 	<AssemblyTitle>WPF-Sorter-2.0</AssemblyTitle>
-	<FileVersion>2.0.8</FileVersion>
+	<FileVersion>2.0.9</FileVersion>
 	<EnableMsixTooling>true</EnableMsixTooling>
 
     <ApplicationIcon>Assets\SorterLOGO.ico</ApplicationIcon>

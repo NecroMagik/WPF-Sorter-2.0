@@ -1,12 +1,13 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿#nullable enable
+
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Options;
-using System.Data;
 using System.Windows;
 using System.Windows.Input;
 using WPF_Sorter_2._0.Contracts.Services;
 using WPF_Sorter_2._0.Contracts.ViewModels;
-using WPF_Sorter_2._0.Core.Models;
+using WPF_Sorter_2._0.Core.Models;  // 👈 UpdateInfo ИЗ Core
 using WPF_Sorter_2._0.Models;
 using WPF_Sorter_2._0.Services;
 using WPF_Sorter_2._0.Views;
@@ -21,9 +22,9 @@ public partial class SettingsViewModel : ObservableObject, INavigationAware
     private readonly IApplicationInfoService _applicationInfoService;
     private readonly UpdateService _updateService;
     private AppTheme _theme;
-    private string _versionDescription;
-    private ICommand _setThemeCommand;
-    private ICommand _privacyStatementCommand;
+    private string _versionDescription = string.Empty;
+    private ICommand? _setThemeCommand;
+    private ICommand? _privacyStatementCommand;
 
     [ObservableProperty]
     private string _applicationInfo = string.Empty;
@@ -36,20 +37,18 @@ public partial class SettingsViewModel : ObservableObject, INavigationAware
 
     public AppTheme Theme
     {
-        get { return _theme; }
-        set { SetProperty(ref _theme, value); }
+        get => _theme;
+        set => SetProperty(ref _theme, value);
     }
 
     public string VersionDescription
     {
-        get { return _versionDescription; }
-        set { SetProperty(ref _versionDescription, value); }
+        get => _versionDescription;
+        set => SetProperty(ref _versionDescription, value);
     }
 
-    public ICommand SetThemeCommand => _setThemeCommand ?? (_setThemeCommand = new RelayCommand<string>(OnSetTheme));
-
-    public ICommand PrivacyStatementCommand => _privacyStatementCommand ?? (_privacyStatementCommand = new RelayCommand(OnPrivacyStatement));
-
+    public ICommand SetThemeCommand => _setThemeCommand ??= new RelayCommand<string>(OnSetTheme);
+    public ICommand PrivacyStatementCommand => _privacyStatementCommand ??= new RelayCommand(OnPrivacyStatement);
     public ICommand CheckForUpdatesCommand => new RelayCommand(async () => await CheckForUpdatesAsync());
 
     public SettingsViewModel(
@@ -83,17 +82,10 @@ public partial class SettingsViewModel : ObservableObject, INavigationAware
                          $"Платформа: .NET 8.0\n" +
                          $"Репозиторий: github.com/NecroMagik/WPF-Sorter-2.0";
 
-        // Сбрасываем статус обновлений при переходе на страницу
         UpdateStatus = string.Empty;
-
-        System.Diagnostics.Debug.WriteLine($"VersionDescription: {VersionDescription}");
-        System.Diagnostics.Debug.WriteLine($"ApplicationInfo: {ApplicationInfo}");
-        System.Diagnostics.Debug.WriteLine("=== END ===");
     }
 
-    public void OnNavigatedFrom()
-    {
-    }
+    public void OnNavigatedFrom() { }
 
     private async Task CheckForUpdatesAsync()
     {
@@ -105,7 +97,7 @@ public partial class SettingsViewModel : ObservableObject, INavigationAware
         try
         {
             _updateService.ResetToastFlag();
-            var updateInfo = await _updateService.CheckForUpdatesAsync();
+            var updateInfo = await _updateService.CheckForUpdatesAsync(showToastIfAvailable: false);
 
             if (updateInfo == null)
             {
@@ -113,8 +105,7 @@ public partial class SettingsViewModel : ObservableObject, INavigationAware
                 return;
             }
 
-            // 👇 ПОКАЗЫВАЕМ КРАСИВОЕ ОКНО
-            var dialog = new UpdateDialog(updateInfo, _applicationInfoService.GetVersion());
+            var dialog = new UpdateDialog(updateInfo, _applicationInfoService.GetVersion(), _updateService);
             dialog.Owner = Application.Current.MainWindow;
 
             var result = dialog.ShowDialog();
@@ -152,8 +143,6 @@ public partial class SettingsViewModel : ObservableObject, INavigationAware
         {
             var filePath = await _updateService.DownloadUpdateAsync(updateInfo, progress);
             UpdateStatus = "✅ Загрузка завершена! Установка...";
-
-            // Устанавливаем обновление
             _updateService.InstallUpdate(filePath);
         }
         catch (Exception ex)

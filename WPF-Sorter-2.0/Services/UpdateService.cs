@@ -1,8 +1,12 @@
-﻿using System;
+﻿#nullable enable
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -12,16 +16,15 @@ using WPF_Sorter_2._0.Core.Models;
 
 namespace WPF_Sorter_2._0.Services;
 
-public class UpdateService
+public class UpdateService : IDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly string _repoOwner = "NecroMagik";
     private readonly string _repoName = "WPF-Sorter-2.0";
     private readonly string _currentVersion;
     private readonly IToastNotificationsService _toastService;
-
+    private bool _disposed = false;
     private bool _toastShownForCurrentUpdate = false;
-    private UpdateInfo? _lastUpdateInfo;
 
     public event EventHandler<UpdateInfo>? UpdateAvailable;
     public event EventHandler? NoUpdateAvailable;
@@ -31,19 +34,15 @@ public class UpdateService
         _currentVersion = applicationInfoService.GetVersion();
         _toastService = toastService;
 
-        System.Net.ServicePointManager.SecurityProtocol =
-        System.Net.SecurityProtocolType.Tls12 |
-        System.Net.SecurityProtocolType.Tls13;
-
-        _httpClient = new HttpClient();
+        var handler = new HttpClientHandler();
+        _httpClient = new HttpClient(handler);
+        _httpClient.Timeout = TimeSpan.FromSeconds(30);
         _httpClient.DefaultRequestHeaders.UserAgent.TryParseAdd("WPF-Sorter-2.0");
-        _httpClient.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+        _httpClient.DefaultRequestHeaders.Accept.Add(
+            new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
     }
 
-    public string GetCurrentVersion()
-    {
-        return _currentVersion;
-    }
+    public string GetCurrentVersion() => _currentVersion;
 
     public async Task<UpdateInfo?> CheckForUpdatesAsync(bool showToastIfAvailable = true)
     {
@@ -53,7 +52,10 @@ public class UpdateService
             Debug.WriteLine($"Current version: {_currentVersion}");
 
             var apiUrl = $"https://api.github.com/repos/{_repoOwner}/{_repoName}/releases/latest";
+            Debug.WriteLine($"📡 Requesting: {apiUrl}");
+
             var response = await _httpClient.GetAsync(apiUrl);
+            Debug.WriteLine($"📡 Response status: {response.StatusCode}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -62,6 +64,8 @@ public class UpdateService
             }
 
             var json = await response.Content.ReadAsStringAsync();
+            Debug.WriteLine($"📄 Response length: {json.Length} chars");
+
             var options = new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
@@ -85,13 +89,20 @@ public class UpdateService
             {
                 Debug.WriteLine("ℹ️ No updates available");
                 _toastShownForCurrentUpdate = false;
-                _lastUpdateInfo = null;
                 NoUpdateAvailable?.Invoke(this, EventArgs.Empty);
                 return null;
             }
 
             var asset = FindBestAsset(release.Assets);
             var cleanChangelog = CleanChangelog(release.Body);
+
+            string? assetHash = null;
+            if (asset != null && !string.IsNullOrEmpty(asset.BrowserDownloadUrl))
+            {
+                Debug.WriteLine($"🔐 Getting hash for: {asset.BrowserDownloadUrl}");
+                assetHash = await GetAssetHashAsync(asset.BrowserDownloadUrl);
+                Debug.WriteLine($"🔐 Hash: {(string.IsNullOrEmpty(assetHash) ? "NOT FOUND" : assetHash)}");
+            }
 
             var updateInfo = new UpdateInfo
             {
@@ -101,6 +112,7 @@ public class UpdateService
                 Changelog = cleanChangelog,
                 AssetName = asset?.Name ?? string.Empty,
                 AssetSize = asset?.Size ?? 0,
+                AssetHash = assetHash ?? string.Empty,
                 IsPrerelease = release.Prerelease,
                 IsNewer = true
             };
@@ -111,26 +123,214 @@ public class UpdateService
             {
                 ShowUpdateToast(updateInfo);
                 _toastShownForCurrentUpdate = true;
-                Debug.WriteLine($"📢 Toast shown (first time for this update)");
-            }
-            else if (showToastIfAvailable && _toastShownForCurrentUpdate)
-            {
-                Debug.WriteLine($"ℹ️ Toast already shown for this update, skipping");
             }
 
             UpdateAvailable?.Invoke(this, updateInfo);
             return updateInfo;
         }
+        catch (HttpRequestException ex)
+        {
+            Debug.WriteLine($"❌ HTTP Request error: {ex.Message}");
+            Debug.WriteLine($"   Stack: {ex.StackTrace}");
+            return null;
+        }
+        catch (TaskCanceledException ex)
+        {
+            Debug.WriteLine($"❌ Timeout error: {ex.Message}");
+            return null;
+        }
+        catch (JsonException ex)
+        {
+            Debug.WriteLine($"❌ JSON parsing error: {ex.Message}");
+            Debug.WriteLine($"   Stack: {ex.StackTrace}");
+            return null;
+        }
+        catch (IOException ex)
+        {
+            Debug.WriteLine($"❌ IO error: {ex.Message}");
+            Debug.WriteLine($"   Stack: {ex.StackTrace}");
+            return null;
+        }
         catch (Exception ex)
         {
             Debug.WriteLine($"❌ CheckForUpdates error: {ex.Message}");
+            Debug.WriteLine($"   Type: {ex.GetType().Name}");
+            Debug.WriteLine($"   Stack: {ex.StackTrace}");
             return null;
         }
     }
 
-    /// <summary>
-    /// Сбрасывает флаг показа Toast (вызывать при ручной проверке в настройках)
-    /// </summary>
+    private async Task<string?> GetAssetHashAsync(string downloadUrl)
+    {
+        try
+        {
+            var hashUrl = downloadUrl + ".sha256";
+            Debug.WriteLine($"🔐 Requesting hash from: {hashUrl}");
+
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(10);
+            client.DefaultRequestHeaders.UserAgent.TryParseAdd("WPF-Sorter-2.0");
+
+            var response = await client.GetAsync(hashUrl);
+            Debug.WriteLine($"🔐 Hash response status: {response.StatusCode}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var hash = await response.Content.ReadAsStringAsync();
+                hash = hash.Trim().Replace("\n", "").Replace("\r", "").Replace(" ", "").ToLowerInvariant();
+                Debug.WriteLine($"🔐 Hash received: {hash}");
+                return hash;
+            }
+            else
+            {
+                Debug.WriteLine($"⚠️ Hash file not found (status: {response.StatusCode})");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"⚠️ Could not get hash: {ex.Message}");
+        }
+        return null;
+    }
+
+    public async Task<string> DownloadUpdateAsync(UpdateInfo updateInfo, IProgress<int>? progress = null)
+    {
+        if (string.IsNullOrEmpty(updateInfo.DownloadUrl))
+            throw new InvalidOperationException("Download URL is empty");
+
+        Debug.WriteLine($"📁 Starting download...");
+        Debug.WriteLine($"   URL: {updateInfo.DownloadUrl}");
+        Debug.WriteLine($"   Expected hash: {updateInfo.AssetHash}");
+
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var workingFolder = Path.Combine(Path.GetTempPath(), $"WPF-Sorter-2.0-Update_{timestamp}");
+
+        Debug.WriteLine($"📁 Working folder: {workingFolder}");
+
+        try
+        {
+            if (!Directory.Exists(workingFolder))
+            {
+                Directory.CreateDirectory(workingFolder);
+                Debug.WriteLine($"📁 Created folder");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"❌ Failed to create folder: {ex.Message}");
+            throw;
+        }
+
+        var tempFilePath = Path.Combine(workingFolder, $"{updateInfo.AssetName}.tmp");
+        var finalFilePath = Path.Combine(workingFolder, updateInfo.AssetName);
+
+        Debug.WriteLine($"   Temp file: {tempFilePath}");
+        Debug.WriteLine($"   Final file: {finalFilePath}");
+
+        try
+        {
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromMinutes(5);
+            client.DefaultRequestHeaders.UserAgent.TryParseAdd("WPF-Sorter-2.0");
+
+            Debug.WriteLine($"⬇️ Downloading...");
+            using var response = await client.GetAsync(updateInfo.DownloadUrl, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+
+            var totalBytes = response.Content.Headers.ContentLength ?? -1;
+            Debug.WriteLine($"   Total bytes: {totalBytes}");
+
+            var bytesRead = 0L;
+            var buffer = new byte[8192];
+            var lastProgress = 0;
+
+            using var contentStream = await response.Content.ReadAsStreamAsync();
+            using var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.Read);
+
+            while (true)
+            {
+                var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
+                if (read == 0) break;
+
+                await fileStream.WriteAsync(buffer, 0, read);
+                bytesRead += read;
+
+                if (totalBytes > 0)
+                {
+                    var currentProgress = (int)((double)bytesRead / totalBytes * 100);
+                    if (currentProgress != lastProgress && currentProgress % 5 == 0)
+                    {
+                        progress?.Report(currentProgress);
+                        lastProgress = currentProgress;
+                    }
+                }
+            }
+
+            await fileStream.FlushAsync();
+            fileStream.Close();
+            progress?.Report(100);
+
+            Debug.WriteLine($"✅ Download complete: {bytesRead} bytes");
+
+            var fileInfo = new FileInfo(tempFilePath);
+            if (fileInfo.Length == 0)
+            {
+                throw new Exception("Downloaded file is empty");
+            }
+
+            // Проверка ХЭША
+            if (!string.IsNullOrEmpty(updateInfo.AssetHash))
+            {
+                Debug.WriteLine($"🔐 Verifying hash...");
+                using var sha256 = SHA256.Create();
+                using var stream = File.OpenRead(tempFilePath);
+                var hashBytes = await sha256.ComputeHashAsync(stream);
+                var actualHash = BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
+
+                Debug.WriteLine($"   Expected: {updateInfo.AssetHash}");
+                Debug.WriteLine($"   Actual:   {actualHash}");
+
+                if (!string.Equals(actualHash, updateInfo.AssetHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException($"Hash mismatch!\nExpected: {updateInfo.AssetHash}\nActual: {actualHash}");
+                }
+                Debug.WriteLine($"✅ Hash verification passed!");
+            }
+            else
+            {
+                Debug.WriteLine($"⚠️ No hash to verify");
+            }
+
+            // Переименование
+            Debug.WriteLine($"📝 Renaming file...");
+            if (File.Exists(finalFilePath))
+            {
+                Debug.WriteLine($"   Removing existing file: {finalFilePath}");
+                try { File.Delete(finalFilePath); }
+                catch (Exception ex) { Debug.WriteLine($"   ⚠️ Could not delete: {ex.Message}"); }
+            }
+
+            File.Move(tempFilePath, finalFilePath);
+            Debug.WriteLine($"✅ File saved: {finalFilePath}");
+
+            return finalFilePath;
+        }
+        catch (IOException ex)
+        {
+            Debug.WriteLine($"❌ IO error during download: {ex.Message}");
+            Debug.WriteLine($"   Stack: {ex.StackTrace}");
+            try { if (File.Exists(tempFilePath)) File.Delete(tempFilePath); } catch { }
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"❌ Download error: {ex.Message}");
+            Debug.WriteLine($"   Stack: {ex.StackTrace}");
+            try { if (File.Exists(tempFilePath)) File.Delete(tempFilePath); } catch { }
+            throw;
+        }
+    }
+
     public void ResetToastFlag()
     {
         _toastShownForCurrentUpdate = false;
@@ -141,7 +341,7 @@ public class UpdateService
     {
         try
         {
-            var iconPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "SorterLOGO.ico");
+            Debug.WriteLine($"📢 Showing toast for version {updateInfo.Version}");
 
             var toastContent = new CommunityToolkit.WinUI.Notifications.ToastContent
             {
@@ -189,103 +389,166 @@ public class UpdateService
             };
 
             _toastService.ShowToastNotification(toast);
-            Debug.WriteLine($"📢 Toast notification shown for version {updateInfo.Version}");
+            Debug.WriteLine($"✅ Toast shown");
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"❌ Failed to show toast: {ex.Message}");
+            Debug.WriteLine($"   Stack: {ex.StackTrace}");
         }
     }
 
-    /// <summary>
-    /// Скачивает обновление
-    /// </summary>
-    public async Task<string> DownloadUpdateAsync(UpdateInfo updateInfo, IProgress<int>? progress = null)
-    {
-        if (string.IsNullOrEmpty(updateInfo.DownloadUrl))
-            throw new InvalidOperationException("Download URL is empty");
-
-        var tempFolder = Path.Combine(Path.GetTempPath(), "WPF-Sorter-2.0-Update");
-        Directory.CreateDirectory(tempFolder);
-
-        var filePath = Path.Combine(tempFolder, updateInfo.AssetName);
-
-        try
-        {
-            // 👇 ИСПОЛЬЗУЕМ WebClient
-            using var client = new System.Net.WebClient();
-            client.Headers.Add("User-Agent", "WPF-Sorter-2.0");
-
-            // 👇 ПРОГРЕСС СКАЧИВАНИЯ
-            if (progress != null)
-            {
-                client.DownloadProgressChanged += (s, e) =>
-                {
-                    progress.Report(e.ProgressPercentage);
-                    Debug.WriteLine($"⬇️ Download progress: {e.ProgressPercentage}%");
-                };
-            }
-
-            // 👇 СКАЧИВАЕМ ФАЙЛ
-            await client.DownloadFileTaskAsync(new Uri(updateInfo.DownloadUrl), filePath);
-
-            Debug.WriteLine($"✅ File downloaded: {filePath}");
-            return filePath;
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"❌ Download error: {ex.Message}");
-            throw;
-        }
-    }
-
-
-    /// <summary>
-    /// Скачивает и устанавливает обновление
-    /// </summary>
     public async Task DownloadAndInstallUpdateAsync(UpdateInfo updateInfo)
     {
-        try
-        {
-            var progress = new Progress<int>(p =>
-            {
-                Debug.WriteLine($"⬇️ Download progress: {p}%");
-            });
-
-            var filePath = await DownloadUpdateAsync(updateInfo, progress);
-            InstallUpdate(filePath);
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"❌ Download error: {ex.Message}");
-            throw;
-        }
+        Debug.WriteLine($"🚀 DownloadAndInstallUpdateAsync called");
+        var filePath = await DownloadUpdateAsync(updateInfo, null);
+        InstallUpdate(filePath);
     }
 
-    /// <summary>
-    /// Запускает установщик обновления
-    /// </summary>
     public void InstallUpdate(string filePath)
     {
-        if (!File.Exists(filePath))
-            throw new FileNotFoundException($"Update file not found: {filePath}");
+        Debug.WriteLine($"🚀 InstallUpdate called: {filePath}");
 
-        var tempPath = Path.Combine(Path.GetTempPath(), "WPF-Sorter-2.0-Update");
+        if (!File.Exists(filePath))
+        {
+            Debug.WriteLine($"❌ File not found: {filePath}");
+            throw new FileNotFoundException($"Update file not found: {filePath}");
+        }
+
+        var tempPath = Path.GetDirectoryName(filePath) ?? Path.GetTempPath();
+        Debug.WriteLine($"   Temp path: {tempPath}");
+
         var installScript = CreateInstallScript(filePath, tempPath);
+        Debug.WriteLine($"   Install script: {installScript}");
+
+        var logDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "ZeN", "Sorter");
+        if (!Directory.Exists(logDir))
+        {
+            Directory.CreateDirectory(logDir);
+            Debug.WriteLine($"📁 Created log directory: {logDir}");
+        }
+
+        var batPath = Path.Combine(tempPath, "install.bat");
+        var batContent = $"@echo off\r\n" +
+                         $"echo ========================================\r\n" +
+                         $"echo WPF-Sorter-2.0 Update Installer\r\n" +
+                         $"echo ========================================\r\n" +
+                         $"echo.\r\n" +
+                         $"echo Log file: {logDir}\\update_log_*.txt\r\n" +
+                         $"echo.\r\n" +
+                         $"echo Starting update...\r\n" +
+                         $"echo.\r\n" +
+                         $"powershell.exe -ExecutionPolicy Bypass -File \"{installScript}\"\r\n" +
+                         $"echo.\r\n" +
+                         $"echo ========================================\r\n" +
+                         $"echo Update completed.\r\n" +
+                         $"echo ========================================\r\n" +
+                         $"echo.\r\n" +
+                         $"pause";
+
+        File.WriteAllText(batPath, batContent, Encoding.UTF8);
+        Debug.WriteLine($"✅ BAT created: {batPath}");
 
         var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
-                FileName = "powershell.exe",
-                Arguments = $"-ExecutionPolicy Bypass -File \"{installScript}\"",
+                FileName = batPath,
                 UseShellExecute = true,
-                WindowStyle = ProcessWindowStyle.Normal
+                WindowStyle = ProcessWindowStyle.Normal,
+                CreateNoWindow = false
             }
         };
 
+        Debug.WriteLine($"🚀 Starting update process...");
+        Debug.WriteLine($"   Command: {batPath}");
+
         Application.Current?.Shutdown();
         process.Start();
+    }
+
+    private string CreateInstallScript(string updateFile, string tempPath)
+    {
+        var scriptPath = Path.Combine(tempPath, "install.ps1");
+        var appDir = AppDomain.CurrentDomain.BaseDirectory;
+        var updateFileName = Path.GetFileName(updateFile);
+
+        var logDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "ZeN", "Sorter");
+        if (!Directory.Exists(logDir)) Directory.CreateDirectory(logDir);
+
+        var logFile = Path.Combine(logDir, $"update_log_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.txt");
+
+        Debug.WriteLine($"📝 Creating install script: {scriptPath}");
+        Debug.WriteLine($"   Log file: {logFile}");
+
+        var scriptContent =
+            "# Update Script\r\n" +
+            $"$logFile = '{logFile}'\r\n" +
+            $"$updateFile = '{updateFile}'\r\n" +
+            $"$appDir = '{appDir}'\r\n" +
+            $"$tempPath = '{tempPath}'\r\n" +
+            "\r\n" +
+            "function Write-Log {\r\n" +
+            "    param([string]$Message)\r\n" +
+            "    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'\r\n" +
+            "    $logMessage = \"[$timestamp] $Message\"\r\n" +
+            "    Write-Host $logMessage\r\n" +
+            "    Add-Content -Path $logFile -Value $logMessage\r\n" +
+            "}\r\n" +
+            "\r\n" +
+            "Write-Log '========== START UPDATE =========='\r\n" +
+            "Write-Log \"Update file: $updateFile\"\r\n" +
+            "Write-Log \"App directory: $appDir\"\r\n" +
+            "\r\n" +
+            "if (-not (Test-Path $updateFile)) {\r\n" +
+            "    Write-Log '❌ Update file not found'\r\n" +
+            "    exit 1\r\n" +
+            "}\r\n" +
+            "\r\n" +
+            "$extractPath = Join-Path $tempPath 'Extract'\r\n" +
+            "Write-Log \"Extract path: $extractPath\"\r\n" +
+            "if (Test-Path $extractPath) { Remove-Item $extractPath -Recurse -Force }\r\n" +
+            "New-Item -ItemType Directory -Path $extractPath -Force | Out-Null\r\n" +
+            "\r\n" +
+            "try {\r\n" +
+            "    if ($updateFile -match '\\.zip$') {\r\n" +
+            "        Write-Log '📦 Extracting ZIP...'\r\n" +
+            "        Expand-Archive -Path $updateFile -DestinationPath $extractPath -Force\r\n" +
+            "        Write-Log '✅ ZIP extracted'\r\n" +
+            "        $sourceDir = $extractPath\r\n" +
+            "    } else {\r\n" +
+            "        Write-Log '📄 Copying EXE...'\r\n" +
+            "        Copy-Item -Path $updateFile -Destination $extractPath -Force\r\n" +
+            "        Write-Log '✅ EXE copied'\r\n" +
+            "        $sourceDir = $extractPath\r\n" +
+            "    }\r\n" +
+            "\r\n" +
+            "    Write-Log '🔄 Copying files...'\r\n" +
+            "    Copy-Item -Path \"$sourceDir\\*\" -Destination $appDir -Recurse -Force\r\n" +
+            "    Write-Log '✅ Files copied!'\r\n" +
+            "\r\n" +
+            "    Write-Log '🚀 Launching...'\r\n" +
+            "    Start-Process -FilePath (Join-Path $appDir 'WPF-Sorter-2.0.exe')\r\n" +
+            "\r\n" +
+            "    Write-Log '🧹 Cleaning up...'\r\n" +
+            "    Remove-Item -Path $tempPath -Recurse -Force -ErrorAction SilentlyContinue\r\n" +
+            "\r\n" +
+            "    Write-Log '========== UPDATE SUCCESSFUL =========='\r\n" +
+            "    exit 0\r\n" +
+            "} catch {\r\n" +
+            "    Write-Log \"❌ ERROR: $_\"\r\n" +
+            "    Write-Log \"   Stack: $($_.ScriptStackTrace)\"\r\n" +
+            "    exit 1\r\n" +
+            "}\r\n";
+
+        File.WriteAllText(scriptPath, scriptContent, Encoding.UTF8);
+        Debug.WriteLine($"✅ Install script created");
+
+        return scriptPath;
     }
 
     private int CompareVersions(string version1, string version2)
@@ -318,88 +581,55 @@ public class UpdateService
             return "Нет описания изменений.";
 
         var cleaned = body
-            .Replace("🚀", "")
-            .Replace("📦", "")
-            .Replace("🪟", "")
-            .Replace("📂", "")
-            .Replace("🔐", "")
-            .Replace("✅", "")
-            .Replace("⚠️", "")
-            .Replace("🎉", "")
-            .Replace("💪", "")
-            .Replace("🔥", "")
-            .Replace("##", "")
-            .Replace("###", "")
-            .Replace("**", "")
-            .Replace("___", "")
-            .Replace("---", "")
-            .Replace("—", "-")
-            .Replace("\r", "")
-            .Trim();
+            .Replace("🚀", "").Replace("📦", "").Replace("🪟", "")
+            .Replace("📂", "").Replace("🔐", "").Replace("✅", "")
+            .Replace("⚠️", "").Replace("🎉", "").Replace("💪", "")
+            .Replace("🔥", "").Replace("##", "").Replace("###", "")
+            .Replace("**", "").Replace("___", "").Replace("---", "")
+            .Replace("—", "-").Replace("\r", "").Trim();
 
         var lines = cleaned.Split('\n')
             .Where(line => !string.IsNullOrWhiteSpace(line))
             .Select(line => line.Trim())
             .ToList();
 
-        if (lines.Count == 0)
-            return "Нет описания изменений.";
-
-        return string.Join("\n", lines);
+        return lines.Count == 0 ? "Нет описания изменений." : string.Join("\n", lines);
     }
 
     private GitHubAsset? FindBestAsset(List<GitHubAsset> assets)
     {
+        Debug.WriteLine($"🔍 Looking for best asset in {assets.Count} assets");
+
         foreach (var asset in assets)
         {
+            Debug.WriteLine($"   Asset: {asset.Name} (Size: {asset.Size})");
             if (asset.Name?.EndsWith(".exe") == true && !asset.Name.Contains("Portable"))
+            {
+                Debug.WriteLine($"   ✅ Selected EXE: {asset.Name}");
                 return asset;
+            }
         }
-
         foreach (var asset in assets)
         {
             if (asset.Name?.EndsWith(".zip") == true)
+            {
+                Debug.WriteLine($"   ✅ Selected ZIP: {asset.Name}");
                 return asset;
+            }
         }
 
+        Debug.WriteLine($"   ❌ No suitable asset found");
         return null;
     }
 
-    private string CreateInstallScript(string updateFile, string tempPath)
+    public void Dispose()
     {
-        var scriptPath = Path.Combine(tempPath, "install.ps1");
-        var appDir = AppDomain.CurrentDomain.BaseDirectory;
-
-        var scriptContent = $@"
-Write-Host '📦 Начинаем установку обновления...' -ForegroundColor Cyan
-
-$updateFile = '{updateFile}'
-$appDir = '{appDir}'
-$tempPath = '{tempPath}'
-
-Write-Host '📁 Распаковка обновления...'
-
-if ($updateFile -match '\.zip$') {{
-    Expand-Archive -Path $updateFile -DestinationPath $tempPath -Force
-    $sourceDir = $tempPath
-}} else {{
-    $sourceDir = $tempPath
-    Copy-Item $updateFile $sourceDir -Force
-}}
-
-Write-Host '🔄 Замена файлов...'
-Copy-Item -Path $sourceDir\* -Destination $appDir -Recurse -Force
-
-Write-Host '✅ Обновление установлено!' -ForegroundColor Green
-Start-Sleep -Seconds 2
-
-Start-Process -FilePath '$appDir\WPF-Sorter-2.0.exe'
-
-Remove-Item -Path $tempPath -Recurse -Force -ErrorAction SilentlyContinue
-";
-
-        File.WriteAllText(scriptPath, scriptContent);
-        return scriptPath;
+        if (!_disposed)
+        {
+            _httpClient?.Dispose();
+            _disposed = true;
+        }
+        GC.SuppressFinalize(this);
     }
 }
 

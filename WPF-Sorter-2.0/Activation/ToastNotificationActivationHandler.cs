@@ -49,7 +49,7 @@ public class ToastNotificationActivationHandler : IActivationHandler
                 var updateInfo = await _updateService.CheckForUpdatesAsync(false);
                 if (updateInfo != null)
                 {
-                    var dialog = new UpdateDialog(updateInfo, _updateService.GetCurrentVersion());
+                    var dialog = new UpdateDialog(updateInfo, _updateService.GetCurrentVersion(), _updateService);
                     dialog.Owner = Application.Current.MainWindow;
                     var result = dialog.ShowDialog();
 

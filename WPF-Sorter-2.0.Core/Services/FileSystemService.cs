@@ -6,32 +6,74 @@ namespace WPF_Sorter_2._0.Services;
 
 public class FileSystemService : IFileSystemService
 {
+    // 👇 Поддержка длинных путей (>260 символов)
+    private const int MAX_PATH = 260;
+
+    private string NormalizePath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return path;
+
+        // Если путь длиннее MAX_PATH, добавляем префикс \\?\
+        if (path.Length > MAX_PATH && !path.StartsWith(@"\\?\"))
+        {
+            if (path.StartsWith(@"\\"))
+            {
+                return @"\\?\UNC\" + path.Substring(2);
+            }
+            return @"\\?\" + path;
+        }
+        return path;
+    }
+
     public async Task<List<string>> GetFilesAsync(string folderPath, bool includeSubfolders, CancellationToken cancellationToken = default)
     {
         return await Task.Run(() =>
         {
             try
             {
-                if (!Directory.Exists(folderPath))
+                var normalizedPath = NormalizePath(folderPath);
+
+                if (!Directory.Exists(normalizedPath))
                 {
                     return new List<string>();
                 }
 
                 var searchOption = includeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-                return Directory.GetFiles(folderPath, "*.*", searchOption).ToList();
+                var files = new List<string>();
+
+                foreach (var file in Directory.EnumerateFiles(normalizedPath, "*.*", searchOption))
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
+
+                    // Возвращаем оригинальный путь
+                    var originalPath = file;
+                    if (file.StartsWith(@"\\?\"))
+                    {
+                        originalPath = file.Substring(4);
+                        if (originalPath.StartsWith(@"UNC\"))
+                        {
+                            originalPath = @"\\" + originalPath.Substring(4);
+                        }
+                    }
+                    files.Add(originalPath);
+                }
+
+                return files;
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
-                // Нет доступа к папке
+                System.Diagnostics.Debug.WriteLine($"⚠️ No access to folder: {ex.Message}");
                 return new List<string>();
             }
-            catch (DirectoryNotFoundException)
+            catch (DirectoryNotFoundException ex)
             {
-                // Папка не найдена
+                System.Diagnostics.Debug.WriteLine($"⚠️ Folder not found: {ex.Message}");
                 return new List<string>();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"❌ GetFiles error: {ex.Message}");
                 return new List<string>();
             }
         }, cancellationToken);
@@ -51,8 +93,9 @@ public class FileSystemService : IFileSystemService
 
         try
         {
-            // Проверяем существование исходного файла
-            if (!File.Exists(sourcePath))
+            var normalizedSource = NormalizePath(sourcePath);
+
+            if (!File.Exists(normalizedSource))
             {
                 result.Success = false;
                 result.ErrorMessage = "Исходный файл не найден";
@@ -60,31 +103,29 @@ public class FileSystemService : IFileSystemService
                 return result;
             }
 
-            // Проверяем существование папки назначения
-            if (!Directory.Exists(destinationFolder))
-            {
-                await EnsureFolderExistsAsync(destinationFolder, cancellationToken);
-            }
+            var normalizedDestFolder = NormalizePath(destinationFolder);
+            await EnsureFolderExistsAsync(normalizedDestFolder, cancellationToken);
 
             var fileName = Path.GetFileName(sourcePath);
             var destPath = Path.Combine(destinationFolder, fileName);
+            var normalizedDest = NormalizePath(destPath);
 
             // Обработка конфликтов имён
-            if (!overwrite && File.Exists(destPath))
+            if (!overwrite && File.Exists(normalizedDest))
             {
                 destPath = GetUniqueFilePath(destPath);
+                normalizedDest = NormalizePath(destPath);
             }
 
             result.DestinationPath = destPath;
 
-            // Выполняем перемещение
             await Task.Run(() =>
             {
-                if (overwrite && File.Exists(destPath))
+                if (overwrite && File.Exists(normalizedDest))
                 {
-                    File.Delete(destPath);
+                    File.Delete(normalizedDest);
                 }
-                File.Move(sourcePath, destPath);
+                File.Move(normalizedSource, normalizedDest);
             }, cancellationToken);
 
             result.Success = true;
@@ -101,6 +142,7 @@ public class FileSystemService : IFileSystemService
             result.Success = false;
             result.ErrorMessage = ex.Message;
             result.OperationType = FileOperationType.Failed;
+            System.Diagnostics.Debug.WriteLine($"❌ MoveFile error: {ex.Message}");
         }
 
         return result;
@@ -120,8 +162,9 @@ public class FileSystemService : IFileSystemService
 
         try
         {
-            // Проверяем существование исходного файла
-            if (!File.Exists(sourcePath))
+            var normalizedSource = NormalizePath(sourcePath);
+
+            if (!File.Exists(normalizedSource))
             {
                 result.Success = false;
                 result.ErrorMessage = "Исходный файл не найден";
@@ -129,31 +172,28 @@ public class FileSystemService : IFileSystemService
                 return result;
             }
 
-            // Проверяем существование папки назначения
-            if (!Directory.Exists(destinationFolder))
-            {
-                await EnsureFolderExistsAsync(destinationFolder, cancellationToken);
-            }
+            var normalizedDestFolder = NormalizePath(destinationFolder);
+            await EnsureFolderExistsAsync(normalizedDestFolder, cancellationToken);
 
             var fileName = Path.GetFileName(sourcePath);
             var destPath = Path.Combine(destinationFolder, fileName);
+            var normalizedDest = NormalizePath(destPath);
 
-            // Обработка конфликтов имён
-            if (!overwrite && File.Exists(destPath))
+            if (!overwrite && File.Exists(normalizedDest))
             {
                 destPath = GetUniqueFilePath(destPath);
+                normalizedDest = NormalizePath(destPath);
             }
 
             result.DestinationPath = destPath;
 
-            // Выполняем копирование
             await Task.Run(() =>
             {
-                if (overwrite && File.Exists(destPath))
+                if (overwrite && File.Exists(normalizedDest))
                 {
-                    File.Delete(destPath);
+                    File.Delete(normalizedDest);
                 }
-                File.Copy(sourcePath, destPath, overwrite);
+                File.Copy(normalizedSource, normalizedDest, overwrite);
             }, cancellationToken);
 
             result.Success = true;
@@ -170,6 +210,7 @@ public class FileSystemService : IFileSystemService
             result.Success = false;
             result.ErrorMessage = ex.Message;
             result.OperationType = FileOperationType.Failed;
+            System.Diagnostics.Debug.WriteLine($"❌ CopyFile error: {ex.Message}");
         }
 
         return result;
@@ -179,37 +220,51 @@ public class FileSystemService : IFileSystemService
     {
         await Task.Run(() =>
         {
-            if (!Directory.Exists(folderPath))
+            var normalizedPath = NormalizePath(folderPath);
+            if (!Directory.Exists(normalizedPath))
             {
-                Directory.CreateDirectory(folderPath);
+                Directory.CreateDirectory(normalizedPath);
             }
         }, cancellationToken);
     }
 
     public bool DirectoryExists(string path)
     {
-        return Directory.Exists(path);
+        try
+        {
+            return Directory.Exists(NormalizePath(path));
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public bool FileExists(string path)
     {
-        return File.Exists(path);
+        try
+        {
+            return File.Exists(NormalizePath(path));
+        }
+        catch
+        {
+            return false;
+        }
     }
 
-    /// <summary>
-    /// Создаёт уникальное имя файла при конфликте
-    /// </summary>
     private string GetUniqueFilePath(string path)
     {
         var directory = Path.GetDirectoryName(path) ?? string.Empty;
         var fileNameWithoutExt = Path.GetFileNameWithoutExtension(path);
         var extension = Path.GetExtension(path);
         var counter = 1;
+        var normalizedPath = NormalizePath(path);
 
-        while (File.Exists(path))
+        while (File.Exists(normalizedPath))
         {
             var newFileName = $"{fileNameWithoutExt} ({counter}){extension}";
             path = Path.Combine(directory, newFileName);
+            normalizedPath = NormalizePath(path);
             counter++;
         }
 

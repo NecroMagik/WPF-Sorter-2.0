@@ -23,53 +23,85 @@ namespace WPF_Sorter_2._0;
 public partial class App : Application
 {
     private IHost _host;
+    private readonly object _serviceLock = new();
 
-    public T GetService<T>()
-        where T : class
-        => _host.Services.GetService(typeof(T)) as T;
-
-
+    public T GetService<T>() where T : class
+    {
+        if (_host == null) return null;
+        return _host.Services.GetService(typeof(T)) as T;
+    }
 
     public App()
     {
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+    }
+
+    private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        if (e.ExceptionObject is Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ FATAL: {ex.Message}");
+            // TODO: Логирование в файл
+        }
     }
 
     private async void OnStartup(object sender, StartupEventArgs e)
     {
-        ToastNotificationManagerCompat.OnActivated += (toastArgs) =>
+        try
+        {
+            ToastNotificationManagerCompat.OnActivated += OnToastActivated;
+
+            var activationArgs = new Dictionary<string, string>
+            {
+                { ToastNotificationActivationHandler.ActivationArguments, string.Empty }
+            };
+            var appLocation = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) ?? string.Empty;
+
+            _host = Host.CreateDefaultBuilder(e.Args)
+                    .ConfigureAppConfiguration(c =>
+                    {
+                        c.SetBasePath(appLocation);
+                        c.AddInMemoryCollection(activationArgs);
+                        c.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+                    })
+                    .ConfigureServices(ConfigureServices)
+                    .Build();
+
+            LoadSystemAccent();
+
+            if (ToastNotificationManagerCompat.WasCurrentProcessToastActivated())
+            {
+                return;
+            }
+
+            await _host.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ Startup error: {ex.Message}");
+            MessageBox.Show($"Ошибка запуска: {ex.Message}", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+        }
+    }
+
+    private void OnToastActivated(ToastNotificationActivatedEventArgsCompat toastArgs)
+    {
+        try
         {
             Current.Dispatcher.Invoke(async () =>
             {
                 var config = GetService<IConfiguration>();
-                config[ToastNotificationActivationHandler.ActivationArguments] = toastArgs.Argument;
-                await _host.StartAsync();
-            });
-        };
-
-        var activationArgs = new Dictionary<string, string>
-        {
-            { ToastNotificationActivationHandler.ActivationArguments, string.Empty }
-        };
-        var appLocation = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
-
-        _host = Host.CreateDefaultBuilder(e.Args)
-                .ConfigureAppConfiguration(c =>
+                if (config != null)
                 {
-                    c.SetBasePath(appLocation);
-                    c.AddInMemoryCollection(activationArgs);
-                })
-                .ConfigureServices(ConfigureServices)
-                .Build();
-
-        // 👇 Загружаем системный акцент
-        LoadSystemAccent();
-
-        if (ToastNotificationManagerCompat.WasCurrentProcessToastActivated())
-        {
-            return;
+                    ((IConfigurationRoot)config)[ToastNotificationActivationHandler.ActivationArguments] = toastArgs.Argument;
+                }
+                await _host?.StartAsync();
+            });
         }
-
-        await _host.StartAsync();
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ Toast activation error: {ex.Message}");
+        }
     }
 
     private void ConfigureServices(HostBuilderContext context, IServiceCollection services)
@@ -85,9 +117,11 @@ public partial class App : Application
         services.AddSingleton<IHashService, HashService>();
         services.AddSingleton<IFileSystemService, FileSystemService>();
         services.AddTransient<SortEngine>();
+
+        // Background Service (Singleton)
         services.AddSingleton<SortBackgroundService>();
 
-        // Services
+        // UI Services
         services.AddSingleton<IToastNotificationsService, ToastNotificationsService>();
         services.AddSingleton<IApplicationInfoService, ApplicationInfoService>();
         services.AddSingleton<ISystemService, SystemService>();
@@ -97,12 +131,8 @@ public partial class App : Application
         services.AddSingleton<INavigationService, NavigationService>();
         services.AddSingleton<SettingsService>();
 
-        services.AddSingleton<UpdateService>(sp =>
-            new UpdateService(
-                sp.GetRequiredService<IApplicationInfoService>(),
-                sp.GetRequiredService<IToastNotificationsService>()
-            )
-        );
+        // Update Service
+        services.AddSingleton<UpdateService>();
 
         // Views and ViewModels
         services.AddTransient<IShellWindow, ShellWindow>();
@@ -125,30 +155,50 @@ public partial class App : Application
     {
         try
         {
-            // 👇 Для границ — яркий цвет
+            if (Application.Current == null) return;
+            var resources = Application.Current.Resources;
+
             var borderColor = SystemAccentService.GetSystemAccentColor();
             var borderBrush = new SolidColorBrush(borderColor);
 
-            // 👇 Для интерфейса — с учётом ColorPrevalence
             var interfaceColor = SystemAccentService.GetInterfaceAccentColor();
             var interfaceBrush = new SolidColorBrush(interfaceColor);
             var interfaceLightBrush = new SolidColorBrush(Color.FromArgb(0x40, interfaceColor.R, interfaceColor.G, interfaceColor.B));
 
-            System.Diagnostics.Debug.WriteLine($"🎨 Border accent: R={borderColor.R}, G={borderColor.G}, B={borderColor.B}");
-            System.Diagnostics.Debug.WriteLine($"🎨 Interface accent: R={interfaceColor.R}, G={interfaceColor.G}, B={interfaceColor.B}");
+            // Lock resource dictionary for thread safety
+            lock (resources)
+            {
+                resources["SystemAccentBrush"] = interfaceBrush;
+                resources["SystemAccentLightBrush"] = interfaceLightBrush;
+                resources["Theme.PrimaryAccentColor"] = interfaceColor;
 
-            // Ресурсы
-            Application.Current.Resources["SystemAccentBrush"] = interfaceBrush;
-            Application.Current.Resources["SystemAccentLightBrush"] = interfaceLightBrush;
-            Application.Current.Resources["Theme.PrimaryAccentColor"] = interfaceColor;
-            Application.Current.Resources["MahApps.Brushes.Accent"] = interfaceBrush;
-            Application.Current.Resources["MahApps.Brushes.Accent2"] = interfaceBrush;
-            Application.Current.Resources["MahApps.Brushes.Accent3"] = interfaceBrush;
-            Application.Current.Resources["MahApps.Brushes.Accent4"] = interfaceBrush;
-            Application.Current.Resources["MahApps.Brushes.AccentBase"] = interfaceBrush;
-            Application.Current.Resources["MahApps.Colors.Accent"] = interfaceColor;
-            Application.Current.Resources["MahApps.Colors.AccentBase"] = interfaceColor;
-            Application.Current.Resources["WindowBorderBrush"] = borderBrush;
+                var accentKeys = new[]
+                {
+                    "MahApps.Brushes.Accent",
+                    "MahApps.Brushes.Accent2",
+                    "MahApps.Brushes.Accent3",
+                    "MahApps.Brushes.Accent4",
+                    "MahApps.Brushes.AccentBase",
+                    "MahApps.Colors.Accent",
+                    "MahApps.Colors.AccentBase"
+                };
+
+                foreach (var key in accentKeys)
+                {
+                    if (key.Contains("Color"))
+                    {
+                        resources[key] = interfaceColor;
+                    }
+                    else
+                    {
+                        resources[key] = interfaceBrush;
+                    }
+                }
+
+                resources["WindowBorderBrush"] = borderBrush;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"🎨 Accent loaded successfully");
         }
         catch (Exception ex)
         {
@@ -158,14 +208,35 @@ public partial class App : Application
 
     private async void OnExit(object sender, ExitEventArgs e)
     {
-        await _host.StopAsync();
-        _host.Dispose();
-        _host = null;
+        try
+        {
+            if (_host != null)
+            {
+                await _host.StopAsync();
+                _host.Dispose();
+                _host = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ Exit error: {ex.Message}");
+        }
     }
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        // TODO: Please log and handle the exception as appropriate to your scenario
         System.Diagnostics.Debug.WriteLine($"❌ Unhandled exception: {e.Exception.Message}");
+        System.Diagnostics.Debug.WriteLine($"Stack: {e.Exception.StackTrace}");
+
+        // TODO: Логирование в файл
+
+        // Показываем пользователю
+        MessageBox.Show(
+            $"Произошла ошибка: {e.Exception.Message}\n\nПодробности записаны в лог.",
+            "Ошибка",
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
+
+        e.Handled = true;
     }
 }

@@ -11,6 +11,7 @@ namespace WPF_Sorter_2._0.Core.Models
         public string DownloadUrl { get; set; } = string.Empty;
         public string Changelog { get; set; } = string.Empty;
         public string AssetName { get; set; } = string.Empty;
+        public string AssetHash { get; set; } = string.Empty;
         public long AssetSize { get; set; }
         public bool IsPrerelease { get; set; }
         public bool IsNewer { get; set; }

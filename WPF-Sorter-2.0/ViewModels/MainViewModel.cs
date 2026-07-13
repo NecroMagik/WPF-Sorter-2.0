@@ -9,7 +9,7 @@ using WPF_Sorter_2._0.Services;
 
 namespace WPF_Sorter_2._0.ViewModels;
 
-public partial class MainViewModel : ObservableObject, INavigationAware
+public partial class MainViewModel : ObservableObject, INavigationAware, IDisposable
 {
     [ObservableProperty]
     private string _selectedFolder = string.Empty;
@@ -36,33 +36,59 @@ public partial class MainViewModel : ObservableObject, INavigationAware
     private Visibility _progressVisibility = Visibility.Collapsed;
 
     private readonly SortBackgroundService _sortService;
-    private readonly SettingsService _settingsService; // 👈 Добавлено!
+    private readonly SettingsService _settingsService;
+    private bool _disposed = false;
+
+    // 👇 Храним слабые ссылки на обработчики для возможности отписки
+    private readonly EventHandler<SortProgress> _progressHandler;
+    private readonly EventHandler<List<FileOperationResult>> _completedHandler;
+    private readonly EventHandler<string> _failedHandler;
+    private readonly EventHandler _startedHandler;
+    private readonly EventHandler _cancelledHandler;
 
     public MainViewModel(SortBackgroundService sortService, SettingsService settingsService)
     {
         _sortService = sortService;
         _settingsService = settingsService;
 
+        // 👇 Сохраняем делегаты для отписки
+        _progressHandler = OnSortProgressUpdated;
+        _completedHandler = OnSortCompleted;
+        _failedHandler = OnSortFailed;
+        _startedHandler = OnSortStarted;
+        _cancelledHandler = OnSortCancelled;
+
         // Подписываемся на события сортировки
-        _sortService.ProgressUpdated += OnSortProgressUpdated;
-        _sortService.SortCompleted += OnSortCompleted;
-        _sortService.SortFailed += OnSortFailed;
-        _sortService.SortStarted += OnSortStarted;
-        _sortService.SortCancelled += OnSortCancelled;
+        _sortService.ProgressUpdated += _progressHandler;
+        _sortService.SortCompleted += _completedHandler;
+        _sortService.SortFailed += _failedHandler;
+        _sortService.SortStarted += _startedHandler;
+        _sortService.SortCancelled += _cancelledHandler;
 
         // Восстанавливаем состояние, если сортировка уже идёт
         RestoreSortingState();
 
         // Загружаем последнюю папку
-        var settings = _settingsService.Settings;
-        if (!string.IsNullOrEmpty(settings.LastSelectedFolder) && Directory.Exists(settings.LastSelectedFolder))
+        LoadLastFolder();
+    }
+
+    private void LoadLastFolder()
+    {
+        try
         {
-            SelectedFolder = settings.LastSelectedFolder;
-            IncludeSubfolders = settings.IncludeSubfolders;
+            var settings = _settingsService.Settings;
+            if (!string.IsNullOrEmpty(settings.LastSelectedFolder) && Directory.Exists(settings.LastSelectedFolder))
+            {
+                SelectedFolder = settings.LastSelectedFolder;
+                IncludeSubfolders = settings.IncludeSubfolders;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ Error loading last folder: {ex.Message}");
         }
     }
 
-    // 👇 Реализация INavigationAware
     public void OnNavigatedTo(object parameter)
     {
         RestoreSortingState();
@@ -70,65 +96,86 @@ public partial class MainViewModel : ObservableObject, INavigationAware
 
     public void OnNavigatedFrom()
     {
-        // Ничего не делаем
+        // Ничего не делаем, но оставляем для INavigationAware
     }
 
     private void RestoreSortingState()
     {
-        if (_sortService.IsSorting && _sortService.CurrentProgress != null)
+        try
         {
-            IsSorting = true;
-            ProgressVisibility = Visibility.Visible;
-            UpdateUIFromProgress(_sortService.CurrentProgress);
-
-            if (!string.IsNullOrEmpty(_sortService.CurrentSourceFolder))
+            if (_sortService.IsSorting && _sortService.CurrentProgress != null)
             {
-                SelectedFolder = _sortService.CurrentSourceFolder;
-                IncludeSubfolders = _sortService.CurrentIncludeSubfolders;
+                IsSorting = true;
+                ProgressVisibility = Visibility.Visible;
+                UpdateUIFromProgress(_sortService.CurrentProgress);
+
+                if (!string.IsNullOrEmpty(_sortService.CurrentSourceFolder))
+                {
+                    SelectedFolder = _sortService.CurrentSourceFolder;
+                    IncludeSubfolders = _sortService.CurrentIncludeSubfolders;
+                }
+            }
+            else if (_sortService.LastResults != null && _sortService.LastResults.Count > 0)
+            {
+                var results = _sortService.LastResults;
+                var successCount = results.Count(r => r.Success);
+                var hashPassed = results.Count(r => r.HashVerified);
+                var hashFailed = results.Count(r => !r.HashVerified && r.Success);
+
+                StatusText = $"✅ Готово! Обработано {successCount} файлов";
+                ProcessedFilesText = $"Обработано: {successCount} из {results.Count}";
+                FilesFoundText = $"ХЭШ: ✅{hashPassed} ❌{hashFailed}";
+                ProgressValue = 100;
+                ProgressVisibility = Visibility.Collapsed;
+                IsSorting = false;
+            }
+            else
+            {
+                IsSorting = false;
+                ProgressVisibility = Visibility.Collapsed;
+                StatusText = "Готов к работе";
+                ProcessedFilesText = "Обработано: 0";
+                FilesFoundText = "Файлов найдено: 0";
+                ProgressValue = 0;
             }
         }
-        else if (_sortService.LastResults != null && _sortService.LastResults.Count > 0)
+        catch (Exception ex)
         {
-            var results = _sortService.LastResults;
-            StatusText = $"✅ Готово! Обработано {results.Count(r => r.Success)} файлов";
-            ProcessedFilesText = $"Обработано: {results.Count(r => r.Success)} из {results.Count}";
-            FilesFoundText = $"ХЭШ: ✅{results.Count(r => r.HashVerified)} ❌{results.Count(r => !r.HashVerified && r.Success)}";
-            ProgressValue = 100;
-            ProgressVisibility = Visibility.Collapsed;
-            IsSorting = false;
-        }
-        else
-        {
+            System.Diagnostics.Debug.WriteLine($"❌ Error restoring state: {ex.Message}");
             IsSorting = false;
             ProgressVisibility = Visibility.Collapsed;
             StatusText = "Готов к работе";
-            ProcessedFilesText = "Обработано: 0";
-            FilesFoundText = "Файлов найдено: 0";
-            ProgressValue = 0;
         }
     }
 
-    // 👇 ТОЛЬКО ОДИН BrowseFolder
     [RelayCommand]
     private void BrowseFolder()
     {
-        var dialog = new VistaFolderBrowserDialog
+        try
         {
-            Description = "Выберите папку для сортировки",
-            UseDescriptionForTitle = true,
-            SelectedPath = SelectedFolder
-        };
+            var dialog = new VistaFolderBrowserDialog
+            {
+                Description = "Выберите папку для сортировки",
+                UseDescriptionForTitle = true,
+                SelectedPath = SelectedFolder
+            };
 
-        if (dialog.ShowDialog() == true)
+            if (dialog.ShowDialog() == true)
+            {
+                SelectedFolder = dialog.SelectedPath;
+                UpdateFileInfo();
+
+                // Сохраняем последнюю папку
+                var settings = _settingsService.Settings;
+                settings.LastSelectedFolder = SelectedFolder;
+                settings.IncludeSubfolders = IncludeSubfolders;
+                _settingsService.SaveSettings();
+            }
+        }
+        catch (Exception ex)
         {
-            SelectedFolder = dialog.SelectedPath;
-            UpdateFileInfo();
-
-            // Сохраняем последнюю папку
-            var settings = _settingsService.Settings;
-            settings.LastSelectedFolder = SelectedFolder;
-            settings.IncludeSubfolders = IncludeSubfolders;
-            _settingsService.SaveSettings();
+            StatusText = $"❌ Ошибка выбора папки: {ex.Message}";
+            System.Diagnostics.Debug.WriteLine($"❌ BrowseFolder error: {ex.Message}");
         }
     }
 
@@ -138,6 +185,23 @@ public partial class MainViewModel : ObservableObject, INavigationAware
         if (string.IsNullOrEmpty(SelectedFolder) || !Directory.Exists(SelectedFolder))
         {
             StatusText = "⚠️ Пожалуйста, выберите существующую папку";
+            return;
+        }
+
+        // Проверяем, есть ли файлы
+        try
+        {
+            var searchOption = IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+            var files = Directory.GetFiles(SelectedFolder, "*.*", searchOption);
+            if (files.Length == 0)
+            {
+                StatusText = "⚠️ В выбранной папке нет файлов";
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"⚠️ Ошибка доступа к папке: {ex.Message}";
             return;
         }
 
@@ -160,106 +224,190 @@ public partial class MainViewModel : ObservableObject, INavigationAware
 
     private void OnSortStarted(object? sender, EventArgs e)
     {
-        IsSorting = true;
-        ProgressVisibility = Visibility.Visible;
-        ProgressValue = 0;
-        StatusText = "🔍 Поиск файлов...";
-        ProcessedFilesText = "Обработано: 0";
+        try
+        {
+            IsSorting = true;
+            ProgressVisibility = Visibility.Visible;
+            ProgressValue = 0;
+            StatusText = "🔍 Поиск файлов...";
+            ProcessedFilesText = "Обработано: 0";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ OnSortStarted error: {ex.Message}");
+        }
     }
 
     private void OnSortProgressUpdated(object? sender, SortProgress progress)
     {
-        UpdateUIFromProgress(progress);
+        try
+        {
+            if (progress != null)
+            {
+                UpdateUIFromProgress(progress);
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ OnSortProgressUpdated error: {ex.Message}");
+        }
     }
 
     private void OnSortCompleted(object? sender, List<FileOperationResult> results)
     {
-        IsSorting = false;
-        ProgressValue = 100;
-        StatusText = $"✅ Готово! Обработано {results.Count(r => r.Success)} файлов";
-        ProcessedFilesText = $"Обработано: {results.Count(r => r.Success)} из {results.Count}";
-        FilesFoundText = $"ХЭШ: ✅{results.Count(r => r.HashVerified)} ❌{results.Count(r => !r.HashVerified && r.Success)}";
-
-        _ = Task.Delay(3000).ContinueWith(_ =>
+        try
         {
-            ProgressVisibility = Visibility.Collapsed;
-        });
+            IsSorting = false;
+            ProgressValue = 100;
+            var successCount = results.Count(r => r.Success);
+            var hashPassed = results.Count(r => r.HashVerified);
+            var hashFailed = results.Count(r => !r.HashVerified && r.Success);
+
+            StatusText = $"✅ Готово! Обработано {successCount} файлов";
+            ProcessedFilesText = $"Обработано: {successCount} из {results.Count}";
+            FilesFoundText = $"ХЭШ: ✅{hashPassed} ❌{hashFailed}";
+
+            // Скрываем прогресс через 3 секунды
+            _ = Task.Delay(3000).ContinueWith(_ =>
+            {
+                try
+                {
+                    ProgressVisibility = Visibility.Collapsed;
+                }
+                catch { }
+            }, TaskScheduler.FromCurrentSynchronizationContext());
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ OnSortCompleted error: {ex.Message}");
+        }
     }
 
     private void OnSortFailed(object? sender, string errorMessage)
     {
-        IsSorting = false;
-        StatusText = $"❌ Ошибка: {errorMessage}";
-        ProgressVisibility = Visibility.Collapsed;
+        try
+        {
+            IsSorting = false;
+            StatusText = $"❌ Ошибка: {errorMessage}";
+            ProgressVisibility = Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ OnSortFailed error: {ex.Message}");
+        }
     }
 
     private void OnSortCancelled(object? sender, EventArgs e)
     {
-        IsSorting = false;
-        StatusText = "⏹️ Сортировка отменена";
-        ProgressVisibility = Visibility.Collapsed;
+        try
+        {
+            IsSorting = false;
+            StatusText = "⏹️ Сортировка отменена";
+            ProgressVisibility = Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ OnSortCancelled error: {ex.Message}");
+        }
     }
 
     private void UpdateUIFromProgress(SortProgress progress)
     {
-        ProgressValue = (int)progress.ProgressPercentage;
-        StatusText = progress.CurrentStatus;
-        ProcessedFilesText = $"Обработано: {progress.ProcessedFiles} из {progress.TotalFiles}";
-        FilesFoundText = $"ХЭШ: ✅{progress.HashCheckPassed} ❌{progress.HashCheckFailed}";
+        try
+        {
+            ProgressValue = (int)Math.Min(100, progress.ProgressPercentage);
+            StatusText = progress.CurrentStatus ?? "Обработка...";
+            ProcessedFilesText = $"Обработано: {progress.ProcessedFiles} из {progress.TotalFiles}";
+            FilesFoundText = $"ХЭШ: ✅{progress.HashCheckPassed} ❌{progress.HashCheckFailed}";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ UpdateUIFromProgress error: {ex.Message}");
+        }
     }
 
     private void UpdateFileInfo()
     {
-        if (string.IsNullOrEmpty(SelectedFolder) || !Directory.Exists(SelectedFolder))
-        {
-            FilesFoundText = "Файлов найдено: 0";
-            return;
-        }
-
         try
         {
+            if (string.IsNullOrEmpty(SelectedFolder) || !Directory.Exists(SelectedFolder))
+            {
+                FilesFoundText = "Файлов найдено: 0";
+                return;
+            }
+
             var searchOption = IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
             var count = Directory.GetFiles(SelectedFolder, "*.*", searchOption).Length;
             FilesFoundText = $"Файлов найдено: {count}";
         }
-        catch
+        catch (UnauthorizedAccessException)
+        {
+            FilesFoundText = "Файлов найдено: 0 (нет доступа)";
+        }
+        catch (Exception ex)
         {
             FilesFoundText = "Файлов найдено: 0";
+            System.Diagnostics.Debug.WriteLine($"❌ UpdateFileInfo error: {ex.Message}");
         }
     }
 
-    private List<Core.Models.FileCategory> GetEnabledCategories()
+    private List<FileCategory> GetEnabledCategories()
     {
         try
         {
-            var app = Application.Current as App;
-            if (app != null)
+            var settings = _settingsService.Settings;
+            if (settings.Categories != null)
             {
-                var sortSetVM = app.GetService<SortSetViewModel>();
-                if (sortSetVM != null)
-                {
-                    return sortSetVM.Categories.Where(c => c.IsEnabled).ToList();
-                }
+                return settings.Categories.Where(c => c.IsEnabled).ToList();
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ GetEnabledCategories error: {ex.Message}");
+        }
 
-        return new List<Core.Models.FileCategory>();
+        return new List<FileCategory>();
     }
 
-    // 👇 ТОЛЬКО ОДИН OnIncludeSubfoldersChanged
     partial void OnIncludeSubfoldersChanged(bool value)
     {
-        UpdateFileInfo();
+        try
+        {
+            UpdateFileInfo();
 
-        // Сохраняем настройку
-        var settings = _settingsService.Settings;
-        settings.IncludeSubfolders = value;
-        _settingsService.SaveSettings();
+            // Сохраняем настройку
+            var settings = _settingsService.Settings;
+            settings.IncludeSubfolders = value;
+            _settingsService.SaveSettings();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ OnIncludeSubfoldersChanged error: {ex.Message}");
+        }
     }
 
     partial void OnSelectedFolderChanged(string value)
     {
         UpdateFileInfo();
+    }
+
+    // 👇 IDisposable для отписки от событий
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            // Отписываемся от всех событий
+            if (_sortService != null)
+            {
+                _sortService.ProgressUpdated -= _progressHandler;
+                _sortService.SortCompleted -= _completedHandler;
+                _sortService.SortFailed -= _failedHandler;
+                _sortService.SortStarted -= _startedHandler;
+                _sortService.SortCancelled -= _cancelledHandler;
+            }
+
+            _disposed = true;
+            GC.SuppressFinalize(this);
+        }
     }
 }
